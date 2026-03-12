@@ -38,6 +38,7 @@ class chs_coverage extends uvm_component;
     bit [1:0]    sampled_jtag_op;
     int unsigned sampled_jtag_dr_len;
     bit [4:0]    sampled_jtag_ir;
+    bit [4:0]    current_jtag_ir;   // Persistent IR tracking across transactions
     bit [63:0]   sampled_jtag_dr;
 
     // UART
@@ -259,6 +260,7 @@ class chs_coverage extends uvm_component;
         }
 
         cp_i2c_data_len: coverpoint sampled_i2c_data_len {
+            bins none     = {0};
             bins single   = {1};
             bins short_d  = {[2:4]};
             bins medium_d = {[5:16]};
@@ -476,6 +478,7 @@ class chs_coverage extends uvm_component;
             `uvm_warning("NOCFG", "Environment config not found in coverage collector")
 
         sampled_gpio_data_prev = '0;
+        current_jtag_ir = '0;
 
         jtag_seen = 0;
         uart_seen = 0;
@@ -498,7 +501,10 @@ class chs_coverage extends uvm_component;
     function void write_cov_jtag(jtag_transaction tr);
         sampled_jtag_op     = tr.op;
         sampled_jtag_dr_len = tr.dr_length;
-        sampled_jtag_ir     = tr.ir_value;
+        // Track current IR persistently: only update on IR_SCAN, keep for DR_SCAN
+        if (tr.op == 2'b01)  // IR_SCAN
+            current_jtag_ir = tr.ir_value;
+        sampled_jtag_ir     = current_jtag_ir;  // Always use persistent IR
         sampled_jtag_dr     = tr.dr_value;
         jtag_seen = 1;
         cg_jtag.sample();

@@ -41,7 +41,8 @@ class jtag_monitor extends uvm_monitor;
 
         tap_state_e state = TLR;
         jtag_transaction tr;
-        bit [63:0] shift_data;
+        bit [63:0] shift_data;     // TDO captured data
+        bit [63:0] tdi_data;       // TDI sent data (for DMI coverage)
         int shift_count;
 
         forever begin
@@ -60,10 +61,12 @@ class jtag_monitor extends uvm_monitor;
                 CAPTURE_DR: begin
                     state = vif.tms ? EXIT1_DR : SHIFT_DR;
                     shift_data = '0;
+                    tdi_data   = '0;
                     shift_count = 0;
                 end
                 SHIFT_DR: begin
                     shift_data[shift_count] = vif.tdo;
+                    tdi_data[shift_count]   = vif.tdi;
                     shift_count++;
                     state = vif.tms ? EXIT1_DR : SHIFT_DR;
                 end
@@ -75,7 +78,8 @@ class jtag_monitor extends uvm_monitor;
                     // Broadcast captured DR transaction
                     tr = jtag_transaction::type_id::create("jtag_mon_tr");
                     tr.op = jtag_transaction::JTAG_DR_SCAN;
-                    tr.dr_rdata = shift_data[31:0];
+                    tr.dr_rdata  = shift_data;  // Full 64-bit TDO data
+                    tr.dr_value  = tdi_data;    // Full 64-bit TDI data (for DMI coverage)
                     tr.dr_length = shift_count;
                     ap.write(tr);
                 end
@@ -83,10 +87,12 @@ class jtag_monitor extends uvm_monitor;
                 CAPTURE_IR: begin
                     state = vif.tms ? EXIT1_IR : SHIFT_IR;
                     shift_data = '0;
+                    tdi_data   = '0;
                     shift_count = 0;
                 end
                 SHIFT_IR: begin
                     shift_data[shift_count] = vif.tdo;
+                    tdi_data[shift_count]   = vif.tdi;
                     shift_count++;
                     state = vif.tms ? EXIT1_IR : SHIFT_IR;
                 end
@@ -97,7 +103,7 @@ class jtag_monitor extends uvm_monitor;
                     state = vif.tms ? SELECT_DR : RTI;
                     tr = jtag_transaction::type_id::create("jtag_mon_tr");
                     tr.op = jtag_transaction::JTAG_IR_SCAN;
-                    tr.ir_value = shift_data[4:0];
+                    tr.ir_value = tdi_data[4:0];  // Use TDI data for IR value
                     ap.write(tr);
                 end
             endcase
