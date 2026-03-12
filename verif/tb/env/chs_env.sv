@@ -13,12 +13,15 @@ class chs_env extends uvm_env;
     chs_env_config m_env_cfg;
 
     // ---------- Agents ----------
-    jtag_agent m_jtag_agent;
-    uart_agent m_uart_agent;
-    spi_agent  m_spi_agent;
-    i2c_agent  m_i2c_agent;
-    gpio_agent m_gpio_agent;
+    jtag_agent  m_jtag_agent;
+    uart_agent  m_uart_agent;
+    spi_agent   m_spi_agent;
+    i2c_agent   m_i2c_agent;
+    gpio_agent  m_gpio_agent;
     chs_axi_agent m_axi_agent;  // AXI LLC/DRAM port passive monitor
+    slink_agent m_slink_agent;  // Serial Link agent
+    vga_agent   m_vga_agent;    // VGA output monitor (passive)
+    usb_agent   m_usb_agent;    // USB 1.1 OHCI agent
 
     // ---------- Infrastructure ----------
     chs_scoreboard        m_scoreboard;
@@ -78,6 +81,24 @@ class chs_env extends uvm_env;
         if (m_env_cfg.has_axi_agent) begin
             m_axi_agent = chs_axi_agent::type_id::create("m_axi_agent", this);
             m_axi_agent.is_active = UVM_PASSIVE;  // SoC-level: passive only
+        end
+
+        if (m_env_cfg.has_slink_agent) begin
+            uvm_config_db#(slink_config)::set(this, "m_slink_agent*", "m_cfg",
+                m_env_cfg.m_slink_cfg);
+            m_slink_agent = slink_agent::type_id::create("m_slink_agent", this);
+        end
+
+        if (m_env_cfg.has_vga_agent) begin
+            uvm_config_db#(vga_config)::set(this, "m_vga_agent*", "m_cfg",
+                m_env_cfg.m_vga_cfg);
+            m_vga_agent = vga_agent::type_id::create("m_vga_agent", this);
+        end
+
+        if (m_env_cfg.has_usb_agent) begin
+            uvm_config_db#(usb_config)::set(this, "m_usb_agent*", "m_cfg",
+                m_env_cfg.m_usb_cfg);
+            m_usb_agent = usb_agent::type_id::create("m_usb_agent", this);
         end
 
         // ---- Create scoreboard, coverage, virtual sequencer ----
@@ -145,6 +166,22 @@ class chs_env extends uvm_env;
             m_axi_agent.ap.connect(m_scoreboard.axi_imp);
             m_axi_agent.ap.connect(m_coverage.axi_imp);
             `uvm_info("ENV", "AXI LLC monitor connected to scoreboard & coverage", UVM_MEDIUM)
+        end
+
+        if (m_env_cfg.has_slink_agent) begin
+            if (m_slink_agent.m_cfg.is_active == UVM_ACTIVE)
+                m_virt_sqr.m_slink_sqr = m_slink_agent.m_sequencer;
+            `uvm_info("ENV", "Serial Link agent connected", UVM_MEDIUM)
+        end
+
+        if (m_env_cfg.has_vga_agent) begin
+            `uvm_info("ENV", "VGA passive monitor connected", UVM_MEDIUM)
+        end
+
+        if (m_env_cfg.has_usb_agent) begin
+            if (m_usb_agent.m_cfg.is_active == UVM_ACTIVE)
+                m_virt_sqr.m_usb_sqr = m_usb_agent.m_sequencer;
+            `uvm_info("ENV", "USB 1.1 agent connected", UVM_MEDIUM)
         end
 
         // ---- Connect RAL to JTAG sequencer ----

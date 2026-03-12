@@ -14,6 +14,9 @@ package chs_env_pkg;
     import i2c_pkg::*;
     import gpio_pkg::*;
     import chs_axi_pkg::*;
+    import slink_pkg::*;
+    import vga_pkg::*;
+    import usb_pkg::*;
 
     // Import RAL package
     import chs_ral_pkg::*;

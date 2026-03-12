@@ -14,13 +14,19 @@ class chs_env_config extends uvm_object;
     bit has_i2c_agent  = 1;
     bit has_gpio_agent = 1;
     bit has_axi_agent  = 1;  // AXI LLC/DRAM port monitor (passive)
+    bit has_slink_agent = 0;  // Serial Link agent
+    bit has_vga_agent   = 0;  // VGA output monitor (passive)
+    bit has_usb_agent   = 0;  // USB 1.1 OHCI agent
 
     // ---------- Sub-agent configuration handles ----------
-    jtag_config m_jtag_cfg;
-    uart_config m_uart_cfg;
-    spi_config  m_spi_cfg;
-    i2c_config  m_i2c_cfg;
-    gpio_config m_gpio_cfg;
+    jtag_config  m_jtag_cfg;
+    uart_config  m_uart_cfg;
+    spi_config   m_spi_cfg;
+    i2c_config   m_i2c_cfg;
+    gpio_config  m_gpio_cfg;
+    slink_config m_slink_cfg;
+    vga_config   m_vga_cfg;
+    usb_config   m_usb_cfg;
 
     // ---------- RAL enable ----------
     bit has_ral = 0;
@@ -36,12 +42,18 @@ class chs_env_config extends uvm_object;
         `uvm_field_int(has_i2c_agent,   UVM_ALL_ON)
         `uvm_field_int(has_gpio_agent,  UVM_ALL_ON)
         `uvm_field_int(has_axi_agent,   UVM_ALL_ON)
+        `uvm_field_int(has_slink_agent, UVM_ALL_ON)
+        `uvm_field_int(has_vga_agent,   UVM_ALL_ON)
+        `uvm_field_int(has_usb_agent,   UVM_ALL_ON)
         `uvm_field_int(has_ral,         UVM_ALL_ON)
         `uvm_field_object(m_jtag_cfg,   UVM_ALL_ON)
         `uvm_field_object(m_uart_cfg,   UVM_ALL_ON)
         `uvm_field_object(m_spi_cfg,    UVM_ALL_ON)
         `uvm_field_object(m_i2c_cfg,    UVM_ALL_ON)
         `uvm_field_object(m_gpio_cfg,   UVM_ALL_ON)
+        `uvm_field_object(m_slink_cfg,  UVM_ALL_ON)
+        `uvm_field_object(m_vga_cfg,    UVM_ALL_ON)
+        `uvm_field_object(m_usb_cfg,    UVM_ALL_ON)
         `uvm_field_int(boot_mode,       UVM_ALL_ON)
     `uvm_object_utils_end
 

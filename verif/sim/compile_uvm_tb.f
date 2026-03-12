@@ -28,6 +28,9 @@
 +incdir+$SOC_UVM/verif/tb/agents/i2c_agent
 +incdir+$SOC_UVM/verif/tb/agents/gpio_agent
 +incdir+$SOC_UVM/verif/tb/agents/axi_agent
++incdir+$SOC_UVM/verif/tb/agents/slink_agent
++incdir+$SOC_UVM/verif/tb/agents/vga_agent
++incdir+$SOC_UVM/verif/tb/agents/usb_agent
 +incdir+$SOC_UVM/verif/tb/env
 +incdir+$SOC_UVM/verif/tb/sequences
 +incdir+$SOC_UVM/verif/tb/sequences/ip
@@ -48,6 +51,11 @@ $SOC_UVM/verif/tb/agents/i2c_agent/i2c_if.sv
 $SOC_UVM/verif/tb/agents/gpio_agent/gpio_if.sv
 $SOC_UVM/verif/tb/agents/axi_agent/chs_axi_if.sv
 
+// ─── New Agent Interface Files (Aşama 10: Out-of-Scope IPs) ───
+$SOC_UVM/verif/tb/agents/slink_agent/slink_if.sv
+$SOC_UVM/verif/tb/agents/vga_agent/vga_if.sv
+$SOC_UVM/verif/tb/agents/usb_agent/usb_if.sv
+
 // ─── UVM Agent Packages ───
 $SOC_UVM/verif/tb/agents/jtag_agent/jtag_pkg.sv
 $SOC_UVM/verif/tb/agents/uart_agent/uart_pkg.sv
@@ -55,6 +63,11 @@ $SOC_UVM/verif/tb/agents/spi_agent/spi_pkg.sv
 $SOC_UVM/verif/tb/agents/i2c_agent/i2c_pkg.sv
 $SOC_UVM/verif/tb/agents/gpio_agent/gpio_pkg.sv
 $SOC_UVM/verif/tb/agents/axi_agent/chs_axi_pkg.sv
+
+// ─── New Agent Packages (Aşama 10: Out-of-Scope IPs) ───
+$SOC_UVM/verif/tb/agents/slink_agent/slink_pkg.sv
+$SOC_UVM/verif/tb/agents/vga_agent/vga_pkg.sv
+$SOC_UVM/verif/tb/agents/usb_agent/usb_pkg.sv
 
 // ─── RAL Package ───
 +incdir+$SOC_UVM/verif/tb/env/ral

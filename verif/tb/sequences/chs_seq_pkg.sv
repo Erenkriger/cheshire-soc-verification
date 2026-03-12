@@ -15,6 +15,8 @@ package chs_seq_pkg;
     import spi_pkg::*;
     import i2c_pkg::*;
     import gpio_pkg::*;
+    import slink_pkg::*;
+    import usb_pkg::*;
 
     // Import environment package (virtual sequencer type)
     import chs_env_pkg::*;
@@ -28,6 +30,8 @@ package chs_seq_pkg;
     `include "ip/spi_base_seq.sv"
     `include "ip/i2c_base_seq.sv"
     `include "ip/gpio_base_seq.sv"
+    `include "ip/slink_base_seq.sv"
+    `include "ip/usb_base_seq.sv"
 
     // ----- RAL frontdoor (depends on jtag_base_seq) -----
     `include "virtual/chs_ral_frontdoor_seq.sv"
@@ -71,5 +75,13 @@ package chs_seq_pkg;
     `include "virtual/chs_cov_gpio_exhaustive_vseq.sv"
     `include "virtual/chs_cov_axi_region_vseq.sv"
     `include "virtual/chs_cov_allproto_vseq.sv"
+
+    // ----- Aşama 10: Out-of-Scope IP Verification -----
+    `include "virtual/chs_bootrom_fetch_vseq.sv"
+    `include "virtual/chs_slink_vseq.sv"
+    `include "virtual/chs_vga_vseq.sv"
+    `include "virtual/chs_usb_vseq.sv"
+    `include "virtual/chs_idma_vseq.sv"
+    `include "virtual/chs_dram_bist_vseq.sv"
 
 endpackage : chs_seq_pkg

@@ -54,6 +54,12 @@ set test_list {
     chs_cov_gpio_exhaustive_test
     chs_cov_axi_region_test
     chs_cov_allproto_test
+    chs_bootrom_fetch_test
+    chs_slink_test
+    chs_vga_test
+    chs_usb_test
+    chs_idma_test
+    chs_dram_bist_test
 }
 
 set total   [llength $test_list]
@@ -192,7 +198,7 @@ foreach test $test_list {
         set fd [open $test_log r]
         # Read only UVM-relevant lines (skip QuestaSim noise)
         while {[gets $fd line] >= 0} {
-            if {[regexp {UVM_|SCB_|SBA|DMI|JTAG|GPIO|UART|SPI|I2C|IDCODE|AXI|ATOP|PROTOCOL|Scoreboard|PASSED|FAILED|Report} $line]} {
+            if {[regexp {UVM_|SCB_|SBA|DMI|JTAG|GPIO|UART|SPI|I2C|IDCODE|AXI|ATOP|PROTOCOL|Scoreboard|PASSED|FAILED|Report|SLINK|VGA|USB|IDMA|DRAM|BIST|BOOTROM} $line]} {
                 puts $cfd "  $line"
             }
         }

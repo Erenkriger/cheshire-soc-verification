@@ -33,6 +33,9 @@ module tb_top;
     import i2c_pkg::*;
     import gpio_pkg::*;
     import chs_axi_pkg::*;
+    import slink_pkg::*;
+    import vga_pkg::*;
+    import usb_pkg::*;
     import chs_env_pkg::*;
     import chs_seq_pkg::*;
     import chs_test_pkg::*;
@@ -108,13 +111,25 @@ module tb_top;
     // GPIO
     logic [31:0] gpio_i, gpio_o, gpio_en_o;
 
-    // Serial Link (directly tied off — not verified by UVM)
+    // Serial Link
     localparam int unsigned SlinkNumChan  = cheshire_pkg::SlinkNumChan;
     localparam int unsigned SlinkNumLanes = cheshire_pkg::SlinkNumLanes;
     logic [SlinkNumChan-1:0]                    slink_rcv_clk_i;
     logic [SlinkNumChan-1:0]                    slink_rcv_clk_o;
     logic [SlinkNumChan-1:0][SlinkNumLanes-1:0] slink_i;
     logic [SlinkNumChan-1:0][SlinkNumLanes-1:0] slink_o;
+
+    // VGA (active outputs from DUT — monitored by UVM vga_agent)
+    logic        vga_hsync;
+    logic        vga_vsync;
+    logic [4:0]  vga_red;
+    logic [5:0]  vga_green;
+    logic [4:0]  vga_blue;
+
+    // USB 1.1 (bidirectional — driven/monitored by UVM usb_agent)
+    logic usb_clk;
+    logic usb_dm_i, usb_dm_o, usb_dm_oe;
+    logic usb_dp_i, usb_dp_o, usb_dp_oe;
 
     // AXI LLC Master (for DRAM model)
     axi_llc_req_t axi_llc_mst_req;
@@ -196,26 +211,26 @@ module tb_top;
         .gpio_i             ( gpio_i      ),
         .gpio_o             ( gpio_o      ),
         .gpio_en_o          ( gpio_en_o   ),
-        // Serial Link (directly tied, not UVM-verified)
+        // Serial Link — driven/monitored by UVM slink_agent
         .slink_rcv_clk_i    ( slink_rcv_clk_i ),
         .slink_rcv_clk_o    ( slink_rcv_clk_o ),
         .slink_i            ( slink_i ),
         .slink_o            ( slink_o ),
-        // VGA (unused)
-        .vga_hsync_o        (     ),
-        .vga_vsync_o        (     ),
-        .vga_red_o          (     ),
-        .vga_green_o        (     ),
-        .vga_blue_o         (     ),
-        // USB (unused)
-        .usb_clk_i          ( 1'b0 ),
-        .usb_rst_ni         ( 1'b1 ),
-        .usb_dm_i           ( '0   ),
-        .usb_dm_o           (      ),
-        .usb_dm_oe_o        (      ),
-        .usb_dp_i           ( '0   ),
-        .usb_dp_o           (      ),
-        .usb_dp_oe_o        (      )
+        // VGA — monitored by UVM vga_agent (passive)
+        .vga_hsync_o        ( vga_hsync ),
+        .vga_vsync_o        ( vga_vsync ),
+        .vga_red_o          ( vga_red   ),
+        .vga_green_o        ( vga_green ),
+        .vga_blue_o         ( vga_blue  ),
+        // USB — driven/monitored by UVM usb_agent
+        .usb_clk_i          ( usb_clk   ),
+        .usb_rst_ni         ( rst_n     ),
+        .usb_dm_i           ( usb_dm_i  ),
+        .usb_dm_o           ( usb_dm_o  ),
+        .usb_dm_oe_o        ( usb_dm_oe ),
+        .usb_dp_i           ( usb_dp_i  ),
+        .usb_dp_o           ( usb_dp_o  ),
+        .usb_dp_oe_o        ( usb_dp_oe )
     );
 
     // ═══════════════════════════════════════════
@@ -251,9 +266,14 @@ module tb_top;
         .mon_r_last_o       (                  )
     );
 
-    // Serial Link tie-off
-    assign slink_rcv_clk_i = '0;
-    assign slink_i         = '0;
+    // ═══════════════════════════════════════════
+    // USB 48MHz Clock Generation
+    // ═══════════════════════════════════════════
+    localparam int unsigned UsbClkPeriodNs = 20;  // 48 MHz ≈ 20.83ns
+    initial begin
+        usb_clk = 1'b0;
+        forever #(UsbClkPeriodNs / 2) usb_clk = ~usb_clk;
+    end
 
     // ═══════════════════════════════════════════
     // UVM Interface Instantiation
@@ -287,6 +307,24 @@ module tb_top;
     gpio_if gpio_vif (
         .clk   ( clk   ),
         .rst_n ( rst_n )
+    );
+
+    // Serial Link interface
+    slink_if slink_vif (
+        .clk   ( clk   ),
+        .rst_n ( rst_n )
+    );
+
+    // VGA interface (passive monitor — no driver)
+    vga_if vga_vif (
+        .clk   ( clk   ),
+        .rst_n ( rst_n )
+    );
+
+    // USB 1.1 interface
+    usb_if usb_vif (
+        .clk   ( usb_clk ),
+        .rst_n ( rst_n   )
     );
 
     // ═══════════════════════════════════════════
@@ -335,6 +373,29 @@ module tb_top;
     assign gpio_i             = gpio_vif.gpio_i;     // UVM driver → DUT inputs
     assign gpio_vif.gpio_o    = gpio_o;               // DUT outputs → UVM monitor
     assign gpio_vif.gpio_en_o = gpio_en_o;            // DUT enables → UVM monitor
+
+    // --- Serial Link (UVM slink_agent drives RX lanes) ---
+    assign slink_vif.data_o      = slink_o;            // DUT TX → UVM monitor
+    assign slink_vif.rcv_clk_o   = slink_rcv_clk_o;   // DUT recovery clock → UVM
+    assign slink_i               = slink_vif.data_i;   // UVM driver → DUT RX lanes
+    assign slink_rcv_clk_i       = slink_vif.rcv_clk_i; // UVM → DUT RX clock
+
+    // --- VGA (passive — DUT outputs → UVM monitor only) ---
+    assign vga_vif.hsync = vga_hsync;
+    assign vga_vif.vsync = vga_vsync;
+    assign vga_vif.red   = vga_red;
+    assign vga_vif.green = vga_green;
+    assign vga_vif.blue  = vga_blue;
+
+    // --- USB 1.1 (bidirectional with tristate resolution) ---
+    // DUT outputs → interface (for monitoring)
+    assign usb_vif.dp_o  = usb_dp_o;     // DUT D+ output → UVM interface
+    assign usb_vif.dm_o  = usb_dm_o;     // DUT D- output → UVM interface
+    assign usb_vif.dp_oe = usb_dp_oe;    // DUT D+ output-enable → UVM
+    assign usb_vif.dm_oe = usb_dm_oe;    // DUT D- output-enable → UVM
+    // UVM driver → DUT inputs
+    assign usb_dp_i      = usb_vif.dp_i; // UVM driver D+ → DUT input
+    assign usb_dm_i      = usb_vif.dm_i; // UVM driver D- → DUT input
 
     // --- AXI LLC (passive monitoring — extract struct fields to interface) ---
     // Write Address Channel
@@ -402,6 +463,12 @@ module tb_top;
             "uvm_test_top.m_env.m_gpio_agent*", "vif", gpio_vif);
         uvm_config_db#(virtual chs_axi_if)::set(null,
             "uvm_test_top.m_env.m_axi_agent*", "vif", axi_llc_vif);
+        uvm_config_db#(virtual slink_if)::set(null,
+            "uvm_test_top.m_env.m_slink_agent*", "vif", slink_vif);
+        uvm_config_db#(virtual vga_if)::set(null,
+            "uvm_test_top.m_env.m_vga_agent*", "vif", vga_vif);
+        uvm_config_db#(virtual usb_if)::set(null,
+            "uvm_test_top.m_env.m_usb_agent*", "vif", usb_vif);
     end
 
     // ═══════════════════════════════════════════

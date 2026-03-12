@@ -15,6 +15,9 @@ package chs_test_pkg;
     import i2c_pkg::*;
     import gpio_pkg::*;
     import chs_axi_pkg::*;
+    import slink_pkg::*;
+    import vga_pkg::*;
+    import usb_pkg::*;
 
     // Import environment & sequence packages
     import chs_env_pkg::*;
@@ -69,5 +72,13 @@ package chs_test_pkg;
     `include "chs_cov_gpio_exhaustive_test.sv"
     `include "chs_cov_axi_region_test.sv"
     `include "chs_cov_allproto_test.sv"
+
+    // ----- Aşama 10: Out-of-Scope IP Verification Tests -----
+    `include "chs_bootrom_fetch_test.sv"
+    `include "chs_slink_test.sv"
+    `include "chs_vga_test.sv"
+    `include "chs_usb_test.sv"
+    `include "chs_idma_test.sv"
+    `include "chs_dram_bist_test.sv"
 
 endpackage : chs_test_pkg

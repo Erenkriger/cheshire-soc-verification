@@ -10,11 +10,13 @@
 class chs_virtual_sequencer extends uvm_sequencer;
 
     // Sub-agent sequencer handles (set during connect_phase)
-    jtag_sequencer m_jtag_sqr;
-    uart_sequencer m_uart_sqr;
-    spi_sequencer  m_spi_sqr;
-    i2c_sequencer  m_i2c_sqr;
-    gpio_sequencer m_gpio_sqr;
+    jtag_sequencer  m_jtag_sqr;
+    uart_sequencer  m_uart_sqr;
+    spi_sequencer   m_spi_sqr;
+    i2c_sequencer   m_i2c_sqr;
+    gpio_sequencer  m_gpio_sqr;
+    slink_sequencer m_slink_sqr;
+    usb_sequencer   m_usb_sqr;
 
     `uvm_component_utils(chs_virtual_sequencer)
 
