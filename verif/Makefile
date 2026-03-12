@@ -64,6 +64,10 @@ TB_INCDIRS := \
 	+incdir+$(TB_AGENT_DIR)/spi_agent  \
 	+incdir+$(TB_AGENT_DIR)/i2c_agent  \
 	+incdir+$(TB_AGENT_DIR)/gpio_agent \
+	+incdir+$(TB_AGENT_DIR)/axi_agent  \
+	+incdir+$(TB_AGENT_DIR)/slink_agent \
+	+incdir+$(TB_AGENT_DIR)/vga_agent  \
+	+incdir+$(TB_AGENT_DIR)/usb_agent  \
 	+incdir+$(TB_ENV_DIR)  \
 	+incdir+$(TB_SEQ_DIR)  \
 	+incdir+$(TB_SEQ_DIR)/ip  \
@@ -78,6 +82,10 @@ TB_PKGS := \
 	$(TB_AGENT_DIR)/spi_agent/spi_pkg.sv   \
 	$(TB_AGENT_DIR)/i2c_agent/i2c_pkg.sv   \
 	$(TB_AGENT_DIR)/gpio_agent/gpio_pkg.sv \
+	$(TB_AGENT_DIR)/axi_agent/chs_axi_pkg.sv \
+	$(TB_AGENT_DIR)/slink_agent/slink_pkg.sv \
+	$(TB_AGENT_DIR)/vga_agent/vga_pkg.sv   \
+	$(TB_AGENT_DIR)/usb_agent/usb_pkg.sv   \
 	$(TB_ENV_DIR)/chs_env_pkg.sv \
 	$(TB_SEQ_DIR)/chs_seq_pkg.sv \
 	$(TB_TEST_DIR)/chs_test_pkg.sv
@@ -88,7 +96,11 @@ TB_IFS := \
 	$(TB_AGENT_DIR)/uart_agent/uart_if.sv \
 	$(TB_AGENT_DIR)/spi_agent/spi_if.sv   \
 	$(TB_AGENT_DIR)/i2c_agent/i2c_if.sv   \
-	$(TB_AGENT_DIR)/gpio_agent/gpio_if.sv
+	$(TB_AGENT_DIR)/gpio_agent/gpio_if.sv \
+	$(TB_AGENT_DIR)/axi_agent/chs_axi_if.sv \
+	$(TB_AGENT_DIR)/slink_agent/slink_if.sv \
+	$(TB_AGENT_DIR)/vga_agent/vga_if.sv   \
+	$(TB_AGENT_DIR)/usb_agent/usb_if.sv
 
 # ╔═══════════════════════════════════════════════════════════════╗
 # ║  QuestaSim Flow                                               ║
