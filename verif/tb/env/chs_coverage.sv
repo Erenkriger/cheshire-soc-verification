@@ -15,6 +15,7 @@
 // ============================================================================
 
 `uvm_analysis_imp_decl(_cov_jtag)
+`uvm_analysis_imp_decl(_cov_jtag_drv)
 `uvm_analysis_imp_decl(_cov_uart)
 `uvm_analysis_imp_decl(_cov_spi)
 `uvm_analysis_imp_decl(_cov_i2c)
@@ -24,7 +25,8 @@
 class chs_coverage extends uvm_component;
 
     // ---------- Analysis imports ----------
-    uvm_analysis_imp_cov_jtag #(jtag_transaction, chs_coverage) jtag_imp;
+    uvm_analysis_imp_cov_jtag     #(jtag_transaction, chs_coverage) jtag_imp;
+    uvm_analysis_imp_cov_jtag_drv #(jtag_transaction, chs_coverage) jtag_drv_imp;
     uvm_analysis_imp_cov_uart #(uart_transaction, chs_coverage) uart_imp;
     uvm_analysis_imp_cov_spi  #(spi_transaction,  chs_coverage) spi_imp;
     uvm_analysis_imp_cov_i2c  #(i2c_transaction,  chs_coverage) i2c_imp;
@@ -40,6 +42,11 @@ class chs_coverage extends uvm_component;
     bit [4:0]    sampled_jtag_ir;
     bit [4:0]    current_jtag_ir;   // Persistent IR tracking across transactions
     bit [63:0]   sampled_jtag_dr;
+
+    // JTAG DMI (from driver-side port — accurate IR/DR values)
+    bit          sampled_dmi_valid;   // 1 when a 41-bit DMI DR scan was driven
+    bit [1:0]    sampled_dmi_op;      // DMI op from driver
+    bit [6:0]    sampled_dmi_addr;    // DMI addr from driver
 
     // UART
     bit [7:0]    sampled_uart_data;
@@ -152,16 +159,16 @@ class chs_coverage extends uvm_component;
             bins dr_with_dmi    = binsof(cp_jtag_op.dr_scan) && binsof(cp_ir_value.dmi);
         }
 
-        // DMI operation tracking
-        cp_dmi_op: coverpoint sampled_jtag_dr[1:0] iff (sampled_jtag_ir == 5'h11 && sampled_jtag_op == 2'b10) {
+        // DMI operation tracking (from driver port — accurate data)
+        cp_dmi_op: coverpoint sampled_dmi_op iff (sampled_dmi_valid) {
             bins nop    = {2'b00};
             bins read   = {2'b01};
             bins write  = {2'b10};
             bins rsv    = {2'b11};
         }
 
-        // SBA address range tracking
-        cp_dmi_addr: coverpoint sampled_jtag_dr[40:34] iff (sampled_jtag_ir == 5'h11 && sampled_jtag_op == 2'b10) {
+        // SBA address range tracking (from driver port — accurate data)
+        cp_dmi_addr: coverpoint sampled_dmi_addr iff (sampled_dmi_valid) {
             bins sbcs       = {7'h38};
             bins sbaddr0    = {7'h39};
             bins sbdata0    = {7'h3C};
@@ -467,7 +474,8 @@ class chs_coverage extends uvm_component;
 
     function void build_phase(uvm_phase phase);
         super.build_phase(phase);
-        jtag_imp = new("jtag_imp", this);
+        jtag_imp     = new("jtag_imp", this);
+        jtag_drv_imp = new("jtag_drv_imp", this);
         uart_imp = new("uart_imp", this);
         spi_imp  = new("spi_imp",  this);
         i2c_imp  = new("i2c_imp",  this);
@@ -479,6 +487,7 @@ class chs_coverage extends uvm_component;
 
         sampled_gpio_data_prev = '0;
         current_jtag_ir = '0;
+        sampled_dmi_valid = 0;
 
         jtag_seen = 0;
         uart_seen = 0;
@@ -502,12 +511,30 @@ class chs_coverage extends uvm_component;
         sampled_jtag_op     = tr.op;
         sampled_jtag_dr_len = tr.dr_length;
         // Track current IR persistently: only update on IR_SCAN, keep for DR_SCAN
-        if (tr.op == 2'b01)  // IR_SCAN
+        if (tr.op == jtag_transaction::JTAG_IR_SCAN)
             current_jtag_ir = tr.ir_value;
         sampled_jtag_ir     = current_jtag_ir;  // Always use persistent IR
         sampled_jtag_dr     = tr.dr_value;
         jtag_seen = 1;
+        // Note: DMI coverpoints (cp_dmi_op, cp_dmi_addr) are sampled from
+        // driver-side port via write_cov_jtag_drv() for accurate IR/DR values
         cg_jtag.sample();
+    endfunction
+
+    // Driver-side JTAG coverage: uses accurate IR/DR data from the sequence
+    // (monitor TAP FSM has inherent NBA synchronization delay with the driver)
+    function void write_cov_jtag_drv(jtag_transaction tr);
+        if (tr.op == jtag_transaction::JTAG_DR_SCAN && tr.dr_length == 41) begin
+            // This is a DMI frame: {addr[6:0], data[31:0], op[1:0]} packed in dr_value
+            sampled_dmi_valid = 1;
+            sampled_dmi_op    = tr.dr_value[1:0];     // op at LSB
+            sampled_dmi_addr  = tr.dr_value[40:34];   // addr at MSB
+            `uvm_info("COV_DMI", $sformatf(
+                "DMI DR driven: addr=0x%02h data=0x%08h op=%0b",
+                sampled_dmi_addr, tr.dr_value[33:2], sampled_dmi_op), UVM_HIGH)
+            cg_jtag.sample();
+            sampled_dmi_valid = 0;  // Reset for next sample
+        end
     endfunction
 
     function void write_cov_uart(uart_transaction tr);

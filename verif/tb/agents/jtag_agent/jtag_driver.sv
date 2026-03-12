@@ -11,6 +11,10 @@ class jtag_driver extends uvm_driver #(jtag_transaction);
     virtual jtag_if vif;
     jtag_config     m_cfg;
 
+    // Driver-side analysis port: broadcasts what was actually driven
+    // (with correct IR/DR values from the sequence, not monitor-captured data)
+    uvm_analysis_port #(jtag_transaction) drv_ap;
+
     `uvm_component_utils(jtag_driver)
 
     function new(string name, uvm_component parent);
@@ -19,6 +23,7 @@ class jtag_driver extends uvm_driver #(jtag_transaction);
 
     function void build_phase(uvm_phase phase);
         super.build_phase(phase);
+        drv_ap = new("drv_ap", this);
         if (!uvm_config_db#(virtual jtag_if)::get(this, "", "vif", vif))
             `uvm_fatal("NOVIF", "JTAG virtual interface not found in config_db")
         if (!uvm_config_db#(jtag_config)::get(this, "", "m_cfg", m_cfg))
@@ -42,6 +47,7 @@ class jtag_driver extends uvm_driver #(jtag_transaction);
         forever begin
             seq_item_port.get_next_item(tr);
             drive_transaction(tr);
+            drv_ap.write(tr);  // Broadcast driven transaction for coverage
             seq_item_port.item_done();
         end
     endtask

@@ -60,6 +60,8 @@ set test_list {
     chs_usb_test
     chs_idma_test
     chs_dram_bist_test
+    chs_sw_hello_test
+    chs_sw_gpio_test
 }
 
 set total   [llength $test_list]

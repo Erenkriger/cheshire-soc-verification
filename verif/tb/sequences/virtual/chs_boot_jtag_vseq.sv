@@ -39,7 +39,7 @@ class chs_boot_jtag_vseq extends uvm_sequence;
     virtual task body();
         jtag_base_seq  jtag_seq;
         bit [31:0]     rdata;
-        bit [40:0]     dmi_word;
+        bit [1:0]      rop;
 
         `uvm_info(get_type_name(), "===== JTAG Boot Virtual Sequence START =====", UVM_LOW)
 
@@ -69,14 +69,14 @@ class chs_boot_jtag_vseq extends uvm_sequence;
         `uvm_info(get_type_name(), "[4/4] DMI write: halt request (dmcontrol)", UVM_MEDIUM)
 
         // dmcontrol: haltreq=1 (bit 31), dmactive=1 (bit 0)
-        // DMI format: {addr[6:0], data[31:0], op[1:0]} = 41 bits
-        dmi_word = {DMI_DMCONTROL, 32'h8000_0001, DMI_OP_WRITE};
-        jtag_seq.do_dr_scan(dmi_word[31:0], DMI_DR_LEN, rdata, p_sequencer.m_jtag_sqr);
+        // Use do_dmi_scan for proper 41-bit DMI frame packing
+        jtag_seq.do_dmi_scan(DMI_DMCONTROL, 32'h8000_0001, DMI_OP_WRITE,
+                             rdata, rop, p_sequencer.m_jtag_sqr);
         jtag_seq.do_idle(10, p_sequencer.m_jtag_sqr);
 
         // DMI Read dmstatus
-        dmi_word = {DMI_DMSTATUS, 32'h0000_0000, DMI_OP_READ};
-        jtag_seq.do_dr_scan(dmi_word[31:0], DMI_DR_LEN, rdata, p_sequencer.m_jtag_sqr);
+        jtag_seq.do_dmi_scan(DMI_DMSTATUS, 32'h0000_0000, DMI_OP_READ,
+                             rdata, rop, p_sequencer.m_jtag_sqr);
         jtag_seq.do_idle(10, p_sequencer.m_jtag_sqr);
 
         `uvm_info(get_type_name(),

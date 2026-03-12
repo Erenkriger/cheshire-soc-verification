@@ -76,6 +76,9 @@ package chs_seq_pkg;
     `include "virtual/chs_cov_axi_region_vseq.sv"
     `include "virtual/chs_cov_allproto_vseq.sv"
 
+    // ----- Aşama 11: SW-Driven Verification -----
+    `include "virtual/chs_sw_driven_vseq.sv"
+
     // ----- Aşama 10: Out-of-Scope IP Verification -----
     `include "virtual/chs_bootrom_fetch_vseq.sv"
     `include "virtual/chs_slink_vseq.sv"

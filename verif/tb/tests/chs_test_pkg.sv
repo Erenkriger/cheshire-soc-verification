@@ -81,4 +81,8 @@ package chs_test_pkg;
     `include "chs_idma_test.sv"
     `include "chs_dram_bist_test.sv"
 
+    // ----- Aşama 11: SW-Driven Verification Tests -----
+    `include "chs_sw_hello_test.sv"
+    `include "chs_sw_gpio_test.sv"
+
 endpackage : chs_test_pkg

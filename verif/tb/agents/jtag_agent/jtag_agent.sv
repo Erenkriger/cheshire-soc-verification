@@ -13,6 +13,7 @@ class jtag_agent extends uvm_agent;
     jtag_sequencer  m_sequencer;
 
     uvm_analysis_port #(jtag_transaction) ap;
+    uvm_analysis_port #(jtag_transaction) drv_ap;  // Driver-side port for coverage
 
     `uvm_component_utils(jtag_agent)
 
@@ -40,6 +41,7 @@ class jtag_agent extends uvm_agent;
 
         if (m_cfg.is_active == UVM_ACTIVE) begin
             m_driver.seq_item_port.connect(m_sequencer.seq_item_export);
+            drv_ap = m_driver.drv_ap;
         end
     endfunction
 

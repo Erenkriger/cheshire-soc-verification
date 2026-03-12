@@ -130,8 +130,10 @@ class chs_env extends uvm_env;
         if (m_env_cfg.has_jtag_agent) begin
             m_jtag_agent.ap.connect(m_scoreboard.jtag_imp);
             m_jtag_agent.ap.connect(m_coverage.jtag_imp);
-            if (m_jtag_agent.m_cfg.is_active == UVM_ACTIVE)
+            if (m_jtag_agent.m_cfg.is_active == UVM_ACTIVE) begin
                 m_virt_sqr.m_jtag_sqr = m_jtag_agent.m_sequencer;
+                m_jtag_agent.drv_ap.connect(m_coverage.jtag_drv_imp);
+            end
         end
 
         if (m_env_cfg.has_uart_agent) begin
