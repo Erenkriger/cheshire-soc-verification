@@ -57,11 +57,21 @@ class chs_dram_bist_vseq extends uvm_sequence;
             int pass = 0, fail = 0;
             bit [31:0] pattern;
 
+            // Phase A: Write all patterns to separate addresses
             for (int bit_pos = 0; bit_pos < 32; bit_pos++) begin
                 pattern = (32'h1 << bit_pos);
-                jtag_seq.sba_write32(DRAM_TEST_BASE, pattern, p_sequencer.m_jtag_sqr);
-                jtag_seq.do_idle(20, p_sequencer.m_jtag_sqr);
-                jtag_seq.sba_read32(DRAM_TEST_BASE, rdata, p_sequencer.m_jtag_sqr);
+                jtag_seq.sba_write32(DRAM_TEST_BASE + (bit_pos * 4), pattern,
+                    p_sequencer.m_jtag_sqr);
+            end
+
+            // Wait for all writes to settle
+            jtag_seq.do_idle(200, p_sequencer.m_jtag_sqr);
+
+            // Phase B: Read back and verify
+            for (int bit_pos = 0; bit_pos < 32; bit_pos++) begin
+                pattern = (32'h1 << bit_pos);
+                jtag_seq.sba_read32(DRAM_TEST_BASE + (bit_pos * 4), rdata,
+                    p_sequencer.m_jtag_sqr);
                 if (rdata == pattern) pass++; else fail++;
             end
 
@@ -79,13 +89,21 @@ class chs_dram_bist_vseq extends uvm_sequence;
             int pass = 0, fail = 0;
             bit [31:0] pattern;
 
+            // Phase A: Write all patterns to separate addresses
             for (int bit_pos = 0; bit_pos < 32; bit_pos++) begin
                 pattern = ~(32'h1 << bit_pos);
-                jtag_seq.sba_write32(DRAM_TEST_BASE + 32'h4, pattern,
-                    p_sequencer.m_jtag_sqr);
-                jtag_seq.do_idle(20, p_sequencer.m_jtag_sqr);
-                jtag_seq.sba_read32(DRAM_TEST_BASE + 32'h4, rdata,
-                    p_sequencer.m_jtag_sqr);
+                jtag_seq.sba_write32(DRAM_TEST_BASE + 32'h80 + (bit_pos * 4),
+                    pattern, p_sequencer.m_jtag_sqr);
+            end
+
+            // Wait for all writes to settle
+            jtag_seq.do_idle(200, p_sequencer.m_jtag_sqr);
+
+            // Phase B: Read back and verify
+            for (int bit_pos = 0; bit_pos < 32; bit_pos++) begin
+                pattern = ~(32'h1 << bit_pos);
+                jtag_seq.sba_read32(DRAM_TEST_BASE + 32'h80 + (bit_pos * 4),
+                    rdata, p_sequencer.m_jtag_sqr);
                 if (rdata == pattern) pass++; else fail++;
             end
 

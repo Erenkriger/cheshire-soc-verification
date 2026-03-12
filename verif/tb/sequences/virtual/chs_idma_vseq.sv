@@ -17,15 +17,25 @@ class chs_idma_vseq extends uvm_sequence;
     `uvm_object_utils(chs_idma_vseq)
     `uvm_declare_p_sequencer(chs_virtual_sequencer)
 
-    // ─── iDMA Register Map (AXI periphs) ───
-    localparam bit [31:0] IDMA_BASE       = 32'h0100_0000;
-    localparam bit [31:0] IDMA_SRC_ADDR   = IDMA_BASE + 32'h00;
-    localparam bit [31:0] IDMA_DST_ADDR   = IDMA_BASE + 32'h08;
-    localparam bit [31:0] IDMA_NUM_BYTES  = IDMA_BASE + 32'h10;
-    localparam bit [31:0] IDMA_CFG        = IDMA_BASE + 32'h18;
-    localparam bit [31:0] IDMA_STATUS     = IDMA_BASE + 32'h20;
-    localparam bit [31:0] IDMA_NEXT_ID    = IDMA_BASE + 32'h28;
-    localparam bit [31:0] IDMA_DONE       = IDMA_BASE + 32'h30;
+    // ─── iDMA Register Map (from idma_reg64_2d_reg_pkg.sv) ───
+    // Cheshire uses the 2D frontend (idma_reg64_2d) at base 0x0100_0000
+    localparam bit [31:0] IDMA_BASE           = 32'h0100_0000;
+    localparam bit [31:0] IDMA_CONF           = IDMA_BASE + 32'h00;  // RW: config
+    localparam bit [31:0] IDMA_STATUS_0       = IDMA_BASE + 32'h04;  // RO: busy status
+    localparam bit [31:0] IDMA_NEXT_ID_0      = IDMA_BASE + 32'h44;  // RO+hwre: read triggers launch!
+    localparam bit [31:0] IDMA_DONE_ID_0      = IDMA_BASE + 32'h84;  // RO: completed transfer ID
+    localparam bit [31:0] IDMA_DST_ADDR_LO    = IDMA_BASE + 32'hD0;  // RW
+    localparam bit [31:0] IDMA_DST_ADDR_HI    = IDMA_BASE + 32'hD4;  // RW
+    localparam bit [31:0] IDMA_SRC_ADDR_LO    = IDMA_BASE + 32'hD8;  // RW
+    localparam bit [31:0] IDMA_SRC_ADDR_HI    = IDMA_BASE + 32'hDC;  // RW
+    localparam bit [31:0] IDMA_LENGTH_LO      = IDMA_BASE + 32'hE0;  // RW
+    localparam bit [31:0] IDMA_LENGTH_HI      = IDMA_BASE + 32'hE4;  // RW
+    localparam bit [31:0] IDMA_DST_STRIDE_LO  = IDMA_BASE + 32'hE8;  // RW
+    localparam bit [31:0] IDMA_DST_STRIDE_HI  = IDMA_BASE + 32'hEC;  // RW
+    localparam bit [31:0] IDMA_SRC_STRIDE_LO  = IDMA_BASE + 32'hF0;  // RW
+    localparam bit [31:0] IDMA_SRC_STRIDE_HI  = IDMA_BASE + 32'hF4;  // RW
+    localparam bit [31:0] IDMA_REPS_LO        = IDMA_BASE + 32'hF8;  // RW
+    localparam bit [31:0] IDMA_REPS_HI        = IDMA_BASE + 32'hFC;  // RW
 
     // ─── SPM regions for DMA test ───
     localparam bit [31:0] SPM_SRC_BASE    = 32'h1000_1000;  // DMA source in SPM
@@ -57,22 +67,29 @@ class chs_idma_vseq extends uvm_sequence;
         // ════════════════════════════════════════════
         `uvm_info(get_type_name(), "[1/5] Reading iDMA status registers", UVM_LOW)
 
-        jtag_seq.sba_read32(IDMA_STATUS, rdata, p_sequencer.m_jtag_sqr);
+        // Read CONF register
+        jtag_seq.sba_read32(IDMA_CONF, rdata, p_sequencer.m_jtag_sqr);
         jtag_seq.dmi_read(7'h38, sbcs_val, p_sequencer.m_jtag_sqr);
         if (sbcs_val[14:12] == 0) begin
             `uvm_info(get_type_name(), $sformatf(
-                "  ✓ iDMA STATUS = 0x%08h", rdata), UVM_LOW)
+                "  ✓ iDMA CONF = 0x%08h (no SBA error)", rdata), UVM_LOW)
             pass_cnt++;
         end else begin
             `uvm_info(get_type_name(), $sformatf(
-                "  ✗ iDMA STATUS SBA error=%0d", sbcs_val[14:12]), UVM_LOW)
+                "  ✗ iDMA CONF SBA error=%0d", sbcs_val[14:12]), UVM_LOW)
             fail_cnt++;
             jtag_seq.sba_init(p_sequencer.m_jtag_sqr);
         end
 
-        jtag_seq.sba_read32(IDMA_NEXT_ID, rdata, p_sequencer.m_jtag_sqr);
+        // Read STATUS register (stream 0)
+        jtag_seq.sba_read32(IDMA_STATUS_0, rdata, p_sequencer.m_jtag_sqr);
         `uvm_info(get_type_name(), $sformatf(
-            "  iDMA NEXT_ID = 0x%08h", rdata), UVM_LOW)
+            "  iDMA STATUS_0 = 0x%08h", rdata), UVM_LOW)
+
+        // Read DONE_ID register (stream 0)
+        jtag_seq.sba_read32(IDMA_DONE_ID_0, rdata, p_sequencer.m_jtag_sqr);
+        `uvm_info(get_type_name(), $sformatf(
+            "  iDMA DONE_ID_0 = 0x%08h", rdata), UVM_LOW)
 
         // ════════════════════════════════════════════
         // Phase 2: Write source data to SPM
@@ -95,42 +112,58 @@ class chs_idma_vseq extends uvm_sequence;
         end
 
         // ════════════════════════════════════════════
-        // Phase 3: Configure iDMA Transfer
+        // Phase 3: Configure iDMA Transfer (correct reg64_2d offsets)
         // ════════════════════════════════════════════
         `uvm_info(get_type_name(), "[3/5] Configuring iDMA 1D transfer (64 bytes)", UVM_LOW)
 
-        // Source address
-        jtag_seq.sba_write32(IDMA_SRC_ADDR, SPM_SRC_BASE, p_sequencer.m_jtag_sqr);
-        // Destination address
-        jtag_seq.sba_write32(IDMA_DST_ADDR, SPM_DST_BASE, p_sequencer.m_jtag_sqr);
-        // Number of bytes
-        jtag_seq.sba_write32(IDMA_NUM_BYTES, 32'd64, p_sequencer.m_jtag_sqr);
-        // Configuration (decouple=1, deburst=1)
-        jtag_seq.sba_write32(IDMA_CFG, 32'h0000_0003, p_sequencer.m_jtag_sqr);
+        // Source address (64-bit, upper 32 bits = 0)
+        jtag_seq.sba_write32(IDMA_SRC_ADDR_LO, SPM_SRC_BASE, p_sequencer.m_jtag_sqr);
+        jtag_seq.sba_write32(IDMA_SRC_ADDR_HI, 32'h0, p_sequencer.m_jtag_sqr);
+        // Destination address (64-bit, upper 32 bits = 0)
+        jtag_seq.sba_write32(IDMA_DST_ADDR_LO, SPM_DST_BASE, p_sequencer.m_jtag_sqr);
+        jtag_seq.sba_write32(IDMA_DST_ADDR_HI, 32'h0, p_sequencer.m_jtag_sqr);
+        // Transfer length in bytes
+        jtag_seq.sba_write32(IDMA_LENGTH_LO, 32'd64, p_sequencer.m_jtag_sqr);
+        jtag_seq.sba_write32(IDMA_LENGTH_HI, 32'h0, p_sequencer.m_jtag_sqr);
+        // 2D stride/reps (set to 0/1 for a pure 1D transfer)
+        jtag_seq.sba_write32(IDMA_SRC_STRIDE_LO, 32'h0, p_sequencer.m_jtag_sqr);
+        jtag_seq.sba_write32(IDMA_SRC_STRIDE_HI, 32'h0, p_sequencer.m_jtag_sqr);
+        jtag_seq.sba_write32(IDMA_DST_STRIDE_LO, 32'h0, p_sequencer.m_jtag_sqr);
+        jtag_seq.sba_write32(IDMA_DST_STRIDE_HI, 32'h0, p_sequencer.m_jtag_sqr);
+        jtag_seq.sba_write32(IDMA_REPS_LO, 32'd1, p_sequencer.m_jtag_sqr);
+        jtag_seq.sba_write32(IDMA_REPS_HI, 32'h0, p_sequencer.m_jtag_sqr);
+        // Configuration: decouple_rw=1 (bit 1), enable_nd=0 (bit 10 = 0 for 1D)
+        jtag_seq.sba_write32(IDMA_CONF, 32'h0000_0002, p_sequencer.m_jtag_sqr);
 
-        `uvm_info(get_type_name(), "  iDMA transfer configured and launched", UVM_LOW)
+        // *** TRIGGER: Reading NEXT_ID_0 launches the transfer ***
+        jtag_seq.sba_read32(IDMA_NEXT_ID_0, rdata, p_sequencer.m_jtag_sqr);
+        `uvm_info(get_type_name(), $sformatf(
+            "  iDMA transfer launched! Transfer ID = %0d", rdata), UVM_LOW)
 
         // ════════════════════════════════════════════
-        // Phase 4: Wait for completion
+        // Phase 4: Wait for completion (poll DONE_ID_0)
         // ════════════════════════════════════════════
         `uvm_info(get_type_name(), "[4/5] Waiting for iDMA completion", UVM_LOW)
         begin
             int timeout = 0;
             bit done = 0;
-            while (!done && timeout < 20) begin
-                jtag_seq.do_idle(100, p_sequencer.m_jtag_sqr);
-                jtag_seq.sba_read32(IDMA_DONE, rdata, p_sequencer.m_jtag_sqr);
-                if (rdata != 0) done = 1;
+            bit [31:0] launch_id = rdata;  // ID returned from NEXT_ID_0 read
+            while (!done && timeout < 50) begin
+                jtag_seq.do_idle(200, p_sequencer.m_jtag_sqr);
+                jtag_seq.sba_read32(IDMA_DONE_ID_0, rdata, p_sequencer.m_jtag_sqr);
+                if (rdata >= launch_id && launch_id != 0) done = 1;
                 timeout++;
             end
 
             if (done) begin
                 pass_cnt++;
                 `uvm_info(get_type_name(), $sformatf(
-                    "  ✓ iDMA transfer completed (DONE=0x%08h)", rdata), UVM_LOW)
+                    "  ✓ iDMA transfer completed (DONE_ID=0x%08h, polls=%0d)",
+                    rdata, timeout), UVM_LOW)
             end else begin
-                `uvm_warning(get_type_name(),
-                    "  ⚠ iDMA transfer did not complete in expected time")
+                `uvm_warning(get_type_name(), $sformatf(
+                    "  ⚠ iDMA transfer did not complete (DONE_ID=0x%08h, launch_id=%0d)",
+                    rdata, launch_id))
             end
         end
 

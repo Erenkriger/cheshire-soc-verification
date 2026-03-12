@@ -89,20 +89,30 @@ class chs_bootrom_fetch_vseq extends uvm_sequence;
         `uvm_info(get_type_name(), "[3/6] Halting CVA6 core via debug halt request", UVM_LOW)
         // dmcontrol: dmactive=1, haltreq=1, hartsel=0
         jtag_seq.dmi_write(DMI_DMCONTROL, 32'h8000_0001, p_sequencer.m_jtag_sqr);
-        jtag_seq.do_idle(100, p_sequencer.m_jtag_sqr);
 
-        // Check dmstatus for halted
-        jtag_seq.dmi_read(DMI_DMSTATUS, dmstatus, p_sequencer.m_jtag_sqr);
-        `uvm_info(get_type_name(), $sformatf(
-            "DMSTATUS = 0x%08h (allhalted=%0b anyhalted=%0b)",
-            dmstatus, dmstatus[9], dmstatus[8]), UVM_LOW)
+        // Poll dmstatus until halted (up to 20 attempts)
+        begin
+            int poll;
+            bit halted = 0;
+            for (poll = 0; poll < 20; poll++) begin
+                jtag_seq.do_idle(200, p_sequencer.m_jtag_sqr);
+                jtag_seq.dmi_read(DMI_DMSTATUS, dmstatus, p_sequencer.m_jtag_sqr);
+                if (dmstatus[9]) begin  // allhalted
+                    halted = 1;
+                    break;
+                end
+            end
+            `uvm_info(get_type_name(), $sformatf(
+                "DMSTATUS = 0x%08h (allhalted=%0b anyhalted=%0b) after %0d polls",
+                dmstatus, dmstatus[9], dmstatus[8], poll+1), UVM_LOW)
 
-        if (dmstatus[9]) begin
-            pass_cnt++;
-            `uvm_info(get_type_name(), "  ✓ CVA6 core halted successfully", UVM_LOW)
-        end else begin
-            fail_cnt++;
-            `uvm_error(get_type_name(), "  ✗ CVA6 core did not halt!")
+            if (halted) begin
+                pass_cnt++;
+                `uvm_info(get_type_name(), "  ✓ CVA6 core halted successfully", UVM_LOW)
+            end else begin
+                fail_cnt++;
+                `uvm_error(get_type_name(), "  ✗ CVA6 core did not halt!")
+            end
         end
 
         // ════════════════════════════════════════════

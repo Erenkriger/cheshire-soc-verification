@@ -128,7 +128,7 @@ class jtag_base_seq extends uvm_sequence #(jtag_transaction);
         bit [31:0] rdata;
         bit [1:0]  rop;
         int        retries = 0;
-        int        max_retries = 5;
+        int        max_retries = 20;
 
         forever begin
             // Select DMI register
@@ -136,7 +136,7 @@ class jtag_base_seq extends uvm_sequence #(jtag_transaction);
             // Send write command
             do_dmi_scan(addr, data, DMI_OP_WRITE, rdata, rop, sqr);
             // Wait for DMI to process
-            do_idle(10, sqr);
+            do_idle(30, sqr);
             // Capture response with NOP (check for errors)
             do_dmi_scan(7'h0, 32'h0, DMI_OP_NOP, rdata, rop, sqr);
 
@@ -169,7 +169,7 @@ class jtag_base_seq extends uvm_sequence #(jtag_transaction);
         bit [31:0] dummy;
         bit [1:0]  rop;
         int        retries = 0;
-        int        max_retries = 5;
+        int        max_retries = 40;
 
         forever begin
             // Select DMI register
@@ -177,7 +177,7 @@ class jtag_base_seq extends uvm_sequence #(jtag_transaction);
             // Send read command
             do_dmi_scan(addr, 32'h0, DMI_OP_READ, dummy, rop, sqr);
             // Wait for DMI to process
-            do_idle(10, sqr);
+            do_idle(50, sqr);
             // Capture response with NOP
             do_dmi_scan(7'h0, 32'h0, DMI_OP_NOP, rdata, rop, sqr);
 
@@ -259,11 +259,15 @@ class jtag_base_seq extends uvm_sequence #(jtag_transaction);
         // Write data → triggers the bus write
         dmi_write(DMI_SBDATA0, data, sqr);
 
-        // Wait for bus transaction to complete
-        do_idle(30, sqr);
-
-        // Check SBCS for errors
-        dmi_read(DMI_SBCS, sbcs_val, sqr);
+        // Wait for bus transaction to complete — poll sbusy
+        begin
+            int sba_polls = 0;
+            do begin
+                do_idle(50, sqr);
+                dmi_read(DMI_SBCS, sbcs_val, sqr);
+                sba_polls++;
+            end while (sbcs_val[21] && sba_polls < 10);  // bit 21 = sbusy
+        end
         if (sbcs_val[21])
             `uvm_warning("SBA", $sformatf("SBA write: still busy after [0x%08h]=0x%08h", addr, data))
         if (sbcs_val[14:12] != 0)
@@ -290,15 +294,22 @@ class jtag_base_seq extends uvm_sequence #(jtag_transaction);
         // Write address → triggers bus read automatically
         dmi_write(DMI_SBADDRESS0, addr, sqr);
 
-        // Wait for bus transaction to complete
-        do_idle(30, sqr);
+        // Wait for bus transaction to complete — poll sbusy
+        begin
+            int sba_polls = 0;
+            do begin
+                do_idle(50, sqr);
+                dmi_read(DMI_SBCS, sbcs_val, sqr);
+                sba_polls++;
+            end while (sbcs_val[21] && sba_polls < 10);  // bit 21 = sbusy
+        end
 
-        // Check SBCS for errors
-        dmi_read(DMI_SBCS, sbcs_val, sqr);
         if (sbcs_val[14:12] != 0) begin
             `uvm_error("SBA", $sformatf("SBA read ERROR: [0x%08h] sberror=%0d", addr, sbcs_val[14:12]))
             rdata = 32'h0;
         end else begin
+            // Extra idle to let DMI bus clear before SBDATA0 read
+            do_idle(50, sqr);
             // Read captured data — only valid if no bus error
             dmi_read(DMI_SBDATA0, rdata, sqr);
             `uvm_info("SBA", $sformatf("SBA read OK: [0x%08h] = 0x%08h", addr, rdata), UVM_MEDIUM)
