@@ -1,0 +1,18 @@
+# Başkasına ait devasa RTL kaynakları engellendi
+cheshire/
+
+# Simülasyon Çıktıları ve Veritabanları engellendi
+verif/sim/logs/
+verif/sim/ucdb/
+verif/sim/coverage_report/
+verif/sim/*.log
+verif/sim/*.txt
+
+# Ide ve OS Dosyaları
+.vscode/
+.DS_Store
+*.swp
+cheshire/.git_backup/
+*.pack
+*.zip
+node_modules/
