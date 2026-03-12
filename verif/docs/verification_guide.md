@@ -1,189 +1,165 @@
-# Zero to Reusable UVM: SoC Doğrulama Rehberi
+# Zero to Reusable UVM: Kapsamlı SoC Doğrulama ve Entegrasyon Rehberi
 
-Bu rehber, baştan sona bir System-on-Chip (SoC) için Universal Verification Methodology (UVM) altyapısının nasıl kurulduğunu, projedeki mimari kararları, hedefleri ve elde edilen sonuçların teknik gerçekliğini detaylandırmak amacıyla hazırlanmıştır. 
+Bu rehber, baştan sona bir System-on-Chip (SoC) için Universal Verification Methodology (UVM) altyapısının nasıl kurulduğunu, projede alınan mimari kararları, tüm test aşamalarını, yazılmış her bir kodu ve elde edilen sonuçların teknik gerçekliğini endüstri standartlarında detaylandırmak üzere **teknik bir sunum dokümanı** olarak hazırlanmıştır.
 
-En temel amacımız: **Elimizde çipin RTL (Register Transfer Level) kodları varken bu devasa UVM altyapısını kurmak; ileride RTL koduna sahip olmadığımız, sadece dokümanlara (Spec) bakarak doğrulama yapmamız gereken "Kara Kutu" projelerine geçtiğimizde elimizde güçlü, tekrar kullanılabilir (reusable) bir UVM iskeletinin hazır bulunmasını sağlamaktır.**
-
----
-
-## 1. Neden UVM Kullanırız?
-
-Çip tasarımları büyüdükçe (milyonlarca gate), klasik SystemVerilog `initial / begin` bloklarıyla veya basit task-based testbench'lerle hataları (bug) bulmak imkansızlaşır. UVM bize şu endüstri standartlarını sunar:
-
-*   **Rastgele ancak Kısıtlı Test (Constrained-Random):** Sadece aklımıza gelen senaryoları değil, binlerce farklı kombinasyonu (farklı baud rate, rastgele veri boyutu, rastgele gecikmeler) otomatik üretmemizi sağlar.
-*   **Ayrıştırılmış Mimari (Separation of Concerns):** Veri üreten yer (Sequence), veriyi pinlere süren yer (Driver), pinleri izleyen yer (Monitor) ve doğruluğunu kontrol eden yer (Scoreboard) tamamen birbirinden bağımsız modern yazılım (Object-Oriented) mimarisiyle yazılır.
-*   **Yeniden Kullanılabilirlik (Reusability):** Bugün Cheshire SoC için yazdığımız UVM UART Agent'ını, yarın Pulsar SoC projesine tek satır kod değiştirmeden kopyalarız. Bu bize devasa bir zaman kazandırır.
+En temel amacımız: Elimizde çipin RTL (Register Transfer Level) kodları varken bu devasa UVM altyapısını kurmak; ileride RTL koduna sahip olmadığımız, sadece dokümanlara (Spec) bakarak doğrulama yapmamız gereken "Kara Kutu" projelerine geçtiğimizde elimizde güçlü, tekrar kullanılabilir (reusable) bir UVM iskeletinin hazır bulunmasını sağlamaktır. Bu doküman projenin evrimiyle birlikte sürekli güncellenecek **Yaşayan Bir Rehber (Living Document)** olarak tasarlanmıştır.
 
 ---
 
-## 2. Cheshire SoC: Gerçekte Ne Kadarını Doğruladık?
+## 1. Neden UVM ve Neyi Doğruluyoruz?
 
-Ekteki mimari görsele (AXI4+ATOP Crossbar ve alt birimler) baktığımızda Cheshire'ın devasa bir çip olduğunu görüyoruz (CVA6 Çekirdekleri, LLC Cache, iDMA, VGA, USB, vb.).
+Çip tasarımları büyüdükçe, klasik SystemVerilog yöntemleriyle (initial blokları, statik tasklar) binlerce köşe durumu (corner cases) tespit etmek imkansızlaşır. UVM bize:
+*   **Constrained-Random Generation:** Binlerce farklı veri paketi kombinasyonunu sınırlı-rastgele şekilde otonom üretebilmeyi.
+*   **Ayrıştırılmış Mimariler (Separation of Concerns):** Üreten (Sequence), fiziksel pin süren (Driver), izleyen (Monitor) ve not veren (Scoreboard) yapıları birbirinden nesne-yönelimli ve bağımsız kılmayı.
+*   **Yeniden Kullanılabilirlik (Reusability):** Projeler arası taşınabilir bağımsız IP-Agent'lar üretmeyi sağlar.
 
-Bizim bu projede kurduğumuz **6 Agent (JTAG, UART, SPI, I2C, GPIO, AXI(Passive))** ile yaptığımız doğrulamanın seviyesi ve sınırları şöyledir:
+### 1.1. Doğrulama Seviyemiz: (Chip/SoC Level)
 
-### Ne Yaptık? Seviyemiz Nedir?
-Bizim yaptığımız doğrulama **Subsystem-Level / SoC Integration Level** bir doğrulamadır.
-1.  **Pin-to-Register (Top-Down):** İşlemciye assembly komutu verip koşturmak yerine, SoC'ye "dışarıdan" (JTAG üzerinden) bağlandık. JTAG -> Debug Module -> AXI Crossbar -> Regbus Demux üzerinden SoC'nin derinliklerindeki IP'lerin (UART, I2C vb.) registerlarına ulaştık ve konfigüre ettik.
-2.  **IP-Level Protocol Check:** Çipin dışarı sarkan pinlerini (UART Tx/Rx, SPI Mosi/Miso vb.) dinleyen agent'lar ile çipin dış dünyayla olan iletişim standartlarını doğruladık.
-3.  **AXI Bus Monitoring:** Çipin kalbini oluşturan AXI4 yolunu pasif olarak dinleyip (AXI Protocol Checker SVA'ları ile) içerideki veri trafiğinde (DRAM erişimi) kilitlenme olmadığını ispatladık.
+Endüstri standardı olan kaynaklara (örn: chipverify.com) göre doğrulamalar 4 temel aşamadan oluşur: Unit, Block, Subsystem ve Chip/SoC sevileri.
 
-### Ne Yapamadık?
-*   **Core-Driven Senaryolar:** CVA6 çekirdeklerini kullanarak içeriden dışarıya karmaşık C kodları koşturmadık.
-*   **Tam Kapsam:** USB, VGA, iDMA, Serial Link gibi karmaşık modüller için Agent geliştirmedik. Onlar şimdilik doğrulama kapsamımızın dışında bırakıldı.
+**Bizim bu projede kurduğumuz yapının kimliği:** **Chip/SoC Level (Top-Level) Verification**'dır.
 
-### Coverage (Kapsam) Gerçeği: %46.62 Ne İfade Ediyor?
-HTML dosyamızda geçen **%46.62 Total Cumulative Covergroup Coverage** oranı, tüm SoC'nin transistör bazında test edilme oranı **DEĞİLDİR**. 
-Bu oran; bizim kendi yazdığımız ve planladığımız **9 adet Covergroup'un (JTAG ihtimalleri, UART sınır değerleri, GPIO geçişleri vb.) hedeflerine ulaşma oranıdır.** Biz sadece kendi "Doğrulama Planımız" içindeki hedeflerin %46'sına ulaştık (Henüz iDMA, VGA vs. coverage hedefleri tanımlanmadığı için paydada bile yoklar). Sunumlarda bunun *Functional Coverage of Targetted IPs* olduğunu belirtmek hayati önem taşır.
+*   Çünkü RTL sarmalayıcımızın adı `soc_top`'tır; sistemin içindeki alt blokları (Block Level) ayrı ayrı koparıp test etmiyoruz (örneğin SPI modülünün kendi tb'si yok).
+*   Testleri çipin Master dış pinlerinden (JTAG pini gibi) başlatıp, çipin derinliklerindeki IP'lere (UART, I2C gibi) ulaşıyor ve işlemi sonuna kadar takip ediyoruz (Pin-to-Register). İşlemciyi (CVA6) bypass etmek yerine UVM ile işlemci register maskelerine "Halt/Resume/SBA (System Bus Access)" işlemlerini göndererek sistemi dışarıdan tam entegrasyon seviyesinde yönetiyoruz.
 
 ---
 
-## 3. UVM Ortamının Mimarisi (`verif/tb/` Klasör Analizi)
+## 2. IP Agent Mimarisi (verif/tb/agents/)
 
-Proje hiyerarşimiz UVM standartlarına sıkı sıkıya bağlıdır. 5 temel klasörün işlevi, içerdikleri ve örnek kod blokları aşağıdadır:
+Mevcut projede **6 farklı protokol ajanımız** bulunmaktadır. Standart bir IP Ajanı UVM hiyerarşisi gereği tam 8 dosyadan oluşur.
 
-### 3.1. `agents/` Klasörü
-**İşlevi:** Belirli bir protokolün (UART, SPI vb.) dış dünya ile konuşmasını sağlayan bağımsız paketlerdir. Her agent kendi içinde Sequencer, Driver, Monitor ve SystemVerilog Interface'ini barındırır.
-**Örnek (UART Monitor Seçimi):** UART hattını pasif olarak dinleyen ve bit bit gelen sinyalleri anlamlı 8-bitlik UVM Transaction paketlerine çeviren modüldür.
+### Tüm Aktif Ajanların Standart Dosya Yapısı (JTAG, UART, SPI, I2C, GPIO)
+Her ajanın klasöründe eksiksiz şekilde şu dosyalar bulunur:
+1.  **`<agent>_pkg.sv`**: Bütün klasör bileşenlerini UVM sınıf yapısına derleyen Package.
+2.  **`<agent>_if.sv`**: UVM yazılım dünyasından donanım RTL dünyasına köprü kuran Virtual Interface.
+3.  **`<agent>_transaction.sv`**: Sürülecek olan paketin OOP mimarideki veri modeli (Örn: UART için 8 bitlik data ve parity_error biti).
+4.  **`<agent>_config.sv`**: Ajanı Active (Driver olan) veya Passive (sadece Monitor) yapan yapılandırma nesnesi.
+5.  **`<agent>_driver.sv`**: İş bitlerini pin üzerindeki fiziksel zamansal gecikmelere aktaran donanım sürücüsü.
+6.  **`<agent>_monitor.sv`**: Pindeki yüksek-alçak gerilim dalgalanmalarını bekleyip tekrar yazılım Transaction türüne toplayan izleyici.
+7.  **`<agent>_sequencer.sv`**: İçeriden gelen veri talebini Driver'a ileten aracı (Router).
+8.  **`<agent>_agent.sv`**: Yukarıdaki tüm sınıfları instantiate edip birbirlerine bağlayan en üst şemsiye.
 
-```systemverilog
-// Örnek: uart_monitor.sv içindeki sinyal yakalama/örnekleme mantığı
-task uart_monitor::run_phase(uvm_phase phase);
-    uart_transaction tr;
-    forever begin
-        // Start bitini (düşen kenar) bekle
-        @(negedge vif.rx);
-        tr = uart_transaction::type_id::create("tr");
-        
-        // Bir baud periyodu kadar bekle (Start bitinin ortası)
-        #(m_cfg.baud_delay_ns);
-        
-        // 8 bitlik veriyi topla
-        for (int i = 0; i < 8; i++) begin
-            #(m_cfg.baud_delay_ns);
-            tr.data[i] = vif.rx;
-        end
-        
-        // Stop biti için bekle
-        #(m_cfg.baud_delay_ns);
-        
-        // Paketi başarılı şekilde okuduk, Scoreboard/Coverage'a yolla
-        ap.write(tr);
-    end
-endtask
-```
-
-### 3.2. `env/` Klasörü
-**İşlevi:** Agent'ların birleştiği, birbirine bağlandığı ve verilerin işlendiği "Ev"dir. Scoreboard, Coverage Collector ve Register Model (RAL) burada Instantiate edilir (yaratılır) ve birbirine bağlanır.
-**Örnek (Scoreboard Comparator Seçimi):** `chs_scoreboard.sv`. Dışarıdan veya içeriden beklenen (Expected) veriyi kuyruğa alır. Monitor'lerden fiziksel gerçekleşen (Actual) veriyi alır ve eşleşip eşleşmediğine bakar. Eğer eşleşmezse testi hata ile durdurur.
-
-```systemverilog
-// Örnek: chs_scoreboard.sv içinde UART verisi doğrulama
-// uart_imp (Monitor'den tetiği alan fonksiyon)
-virtual function void write_uart(uart_transaction tr);
-    bit [7:0] expected_data;
-    
-    // Test tarafından önceden kuyruğa atılmış veri var mı?
-    if (expected_uart_data.size() > 0) begin
-        expected_data = expected_uart_data.pop_front();
-        
-        // Gelen veri ile beklenen veriyi karşılaştır
-        if (tr.data === expected_data) begin
-            uart_match_count++;
-            `uvm_info("SCB_UART", $sformatf("PASS! Gelen: %h | Beklenen: %h", tr.data, expected_data), UVM_HIGH)
-        end else begin
-            uart_mismatch_count++;
-            `uvm_error("SCB_UART_ERR", $sformatf("FAIL! Gelen: %h | Beklenen: %h", tr.data, expected_data))
-        end
-    end
-endfunction
-```
-
-### 3.3. `sequences/` Klasörü
-**İşlevi:** Sistemi test edecek senaryoların (trafik bilgisinin) üretildiği yerdir. UVM'de testler kodlanmaz, senaryolar (sequences) kodlanır; testler sadece bu senaryoları çağırır. System-level (Virtual) ve IP-level diziler içerir.
-**Örnek (Virtual Sequence Seçimi):** `chs_cov_axi_region_vseq.sv`. SoC içindeki belleklere (BootRom, PLIC, DRAM vb.) sırasıyla paket yollayarak hedef bölgelerdeki adres dekoderlerini (AXI Crossbar -> Regbus Demux) test eder.
-
-```systemverilog
-// Örnek: Tüm cihazlara JTAG-SBA üzerinden sinyal basma senaryosu
-virtual task body();
-    jtag_base_seq j_seq;
-    bit [31:0] rdata;
-    
-    j_seq = jtag_base_seq::type_id::create("j_seq");
-    
-    // Virtual Sequencer üzerindeki JTAG sequencera bağlanarak DMI okuma/yazma taskları çağırılır
-    `uvm_info("SEQ", "SBA üzerinden UART TX registerına 'A' harfi yazılıyor (Adres: 0x0300_2000)", UVM_LOW)
-    j_seq.do_sba_write(32'h0300_2000, 32'h0000_0041, p_sequencer.m_jtag_sqr);
-    
-    `uvm_info("SEQ", "SBA üzerinden SPI konfigürasyon registerı okunuyor", UVM_LOW)
-    j_seq.do_sba_read(32'h0300_4004, rdata, p_sequencer.m_jtag_sqr);
-endtask
-```
-
-### 3.4. `tests/` Klasörü
-**İşlevi:** Simülasyonu başlatan en üst seviye UVM sınıflarıdır. Mimariye hangi özelliklerin açılıp kapanacağını söyler (Örn: "Has_UART=1, Has_VGA=0"). Ortamı ayağa kaldırır (Config DB) ve spesifik bir sequence'ı tetikler.
-**Örnek (Base Test Config Seçimi):** `chs_base_test.sv`. Factory metodolojisi kullanılarak tüm ortamın konfigürasyonu buradan dağıtılır.
-
-```systemverilog
-// Örnek: chs_base_test.sv Environment ayarları
-virtual function void build_phase(uvm_phase phase);
-    super.build_phase(phase);
-    
-    // Ortam ayarları objesi oluşturulur
-    m_env_cfg = chs_env_config::type_id::create("m_env_cfg");
-    
-    // Testbench'e özel ayarlamalar
-    m_env_cfg.has_jtag_agent = 1;
-    m_env_cfg.has_uart_agent = 1;
-    m_env_cfg.has_ral = 1; // Register Abstaction Layer kullanımını aç
-    
-    // Bu ayarlar Database'e konularak Env sınıfının çekmesi sağlanır
-    uvm_config_db#(chs_env_config)::set(this, "m_env*", "m_env_cfg", m_env_cfg);
-    
-    // Tüm ortamın yaratılması
-    m_env = chs_env::type_id::create("m_env", this);
-endfunction
-```
-
-### 3.5. `top/` Klasörü
-**İşlevi:** UVM'nin yazılım tarafı (class tabanlı) ile Çipin donanım tarafının (SystemVerilog Modülleri, RTL) birbiriyle fiziksel elektrik kablolarıyla bağlandığı en üst (Tb_top) dosyalarıdır.
-**Örnek (Protocol Checker):** `chs_protocol_checker.sv`. Bu UVM sınıfı değil, bir SystemVerilog Assertion (SVA) modülüdür. Çipin pinlerine donanımsal olarak bağlanıp UVM'den bağımsız protokol hatalarını milisaniye kilitlenmeden yakalar.
-
-```systemverilog
-// Örnek: JTAG TRST Sinyal Davranışı Doğrulaması (SVA)
-module chs_protocol_checker(
-    input logic clk,
-    input logic rst_n
-);
-
-    // Kural: Reset kalktıktan sonra en az 4 clock boyunca tertemiz kalmalı (Glitch olmamalı)
-    property p_reset_stable_after_deassert;
-        @(posedge clk)
-        $rose(rst_n) |-> ##[1:4] rst_n;
-    endproperty
-    
-    // Assert komutu: Kural ihlal edilirse simülasyona hata at!
-    a_reset_stable: assert property (p_reset_stable_after_deassert) 
-        else $error("SVA ERROR: System Reset (rst_n) glitch tespit edildi!");
-
-endmodule
-```
+*(Not: `axi_agent` sadece 5 dosyadan oluşur; RTL içerisindeki CVA6 AXI veri aktarımını bozmamak için Driver'ı olmayan, salt pasif bir gözlem ajanıdır).*
 
 ---
 
-## 4. "Zero to Reusable UVM": Başka Bir SoC'ye Geçiş (Porting)
+## 3. Coverage (Kapsam) Altyapısının Anatomisi
 
-Bu projenin en büyük artısı, elimizde RTL olmayan sadece "Kağıt üzerindeki Mimari Specten" ibaret olan yepyeni bir çip tasarımına bu yapıyı saniyeler içinde taşıyabilme özgürlüğüdür. Yeni bir projeye geçerken izlenecek yol:
+Projedeki **%46.62 Functional Coverage** oranının anlamı; sistem genel transistörlerinin toggle edilme oranı DEĞİL, özel olarak izlemek üzere tanımladığımız hedeflerin bitirilme oranıdır. UVM Ortamındaki `chs_coverage.sv` (616 satır) dosyamızda tanımlanmış olan **9 Covergroup** ve analizleri şöyledir:
 
-### 🟢 1. Aynen Kopyalanacaklar (%100 Reusable)
-*   **Tüm IP Agent'ları:** `verif/tb/agents/` (UART, I2C, SPI vb.). İletişim protokolleri global standarttır (IEEE, TI, I2C Philips). Yeni çipin UART'ı da aynı standartta olacağı için bu klasör hiçbir kod değişikliği olmadan direkt kopyalanır.
+### 3.1. `cg_boot_mode`
+*   **Hedef:** Sistemin tetiklenme modlarının takibi.
+*   **Binler:** JTAG Boot (`2'b00`), Serial Link Boot (`2'b01`), UART Boot (`2'b10`), Reserved (`2'b11`).
 
-### 🟡 2. Üzerinde Küçük Değişiklikler Yapılacaklar (Modify)
-*   **Testbench Top (`tb_top.sv`):** Eski SoC'nin ismi (`cheshire_soc`) silinip yeni SoC (`new_chip_soc`) instantiate edilir. Sinyaller ajanın Virtual Interface'lerine yeni pin isimleriyle yeniden bağlanır.
-*   **Scoreboard & Coverage:** Yeni çipteki bellek büyüklüklerine ve UART modülü sayısına (örn: yeni çipte 3 UART varsa) göre Covergroup limitleri genişletilir.
+### 3.2. `cg_jtag` (Derinlemesine DMI Kavraması)
+*   **Hedef:** JTAG bağlantısının IR/DR komutlarının ve DMI adreslemesinin test edildiğinden emin olmak.
+*   **Binler:** JTAG operasyonu (reset, ir_scan, dr_scan, idle), Data Register Uzunluğu (0'dan 64 bite kadar sıklık ölçümleri).
+*   **DMI Binleri:** Debug Module Interface'inin NOP, READ, WRITE opsiyonları kullanıldı mı?
+*   **Cross Coverage:** Hangi IR Komutu ile hangi JTAG State makinesi komutu kesişti (`cx_op_ir`).
 
-### 🔴 3. Tamamen Baştan Oluşturulacaklar (Re-write)
-*   **Register Model (RAL):** Her donanımın register map'i, adres offsetleri ve interrupt uçları benzersizdir. Bu yüzden `tb/env/ral` klasörü taşınmaz. Yeni SoC'nin dokümanlarından (CSV, IP-XACT formatında) yeni bir UVM RAL modeli otomatik generate ettirilip ortama konulur.
-*   **Virtual Sequences:** `tb/sequences/virtual/` içindeki spesifik test akışları değişir. Yeni çipteki sensörlere uyan yeni "Memory-to-Memory DMA okumaları", "Boot senaryoları" için yep yeni senaryolar yazılır.
+### 3.3. `cg_uart`
+*   **Hedef:** Seri iletim veri türlerini ve bilerek enjekte edilen hata testlerini ölçmek.
+*   **Binler:** Veri karakter dağılımı (Sıfır, Kontrol Karakterleri, Yazdırılabilir Düşük, Yazdırılabilir Yüksek, Tümü 1'ler), İletim yönü (TX/RX).
+*   **Hata Binleri:** Parity Error test edildi mi? Framing Error (Baud sapması) test edildi mi?
 
-**Sonuç olarak:** Projede temel altyapının %80'ini (`Agentlar`, `Driver`, `SVA altyapısı`, `Tb hiyerarşisi`) tamamen kurtarıp, sadece yeni çipin ruhuna göre Sequence ve Scoreboard'ı yönlendiririz. Bu da bir "Verification Engineer"ı sıfırdan ortam kurma zahmetinden aylarca kurtarır.
+### 3.4. `cg_spi` & `cg_i2c`
+*   **Hedef:** Haberleşme hatlarındaki burst boyutu ve operasyonel modların ölçümü.
+*   **SPI Binleri:** Standart, Dual, Quad modları denendi mi? CS0 ve CS1 hedeflerine transfer yapıldı mı? MOSI boyut ölçümleri.
+*   **I2C Binleri:** READ/WRITE, özel adres testleri (general call, sensör range), ve eksik bit (NACK) durumları gönderildi mi?
+
+### 3.5. `cg_gpio`
+*   **Hedef:** Evrensel giriş çıkış pinlerinin mantık durumları ve geçişlerinin tespiti.
+*   **Binler:** Yön atamaları (all_input, all_output, byte_pattern), Veri patternleri (checkerboard, walking_one), Mantık Geçişleri (Bir önceki state'den sonrakine geçiş - Multi-bit toggle durumu).
+
+### 3.6. `cg_axi` & `cg_axi_region` (Veri Yolu Tıkanıklık Testi)
+*   **Hedef:** Sistemin atardamarı olan AXI veri yolundaki burst (paket taşıma) ve gecikmelerin takibi.
+*   **Binler:** Read/Write, Burst Type (INCR, WRAP), Size, Latency Cycles (fast, normal, very_slow), Error Reponse Type (OKAY, SLVERR, DECERR).
+*   **Region Binleri:** SBA yolu üzerinden istek yapılan farklı bellek maskelerinin takibi: `DEBUG`, `BOOTROM`, `CLINT`, `PLIC`, `PERIPHERALS`, `DRAM`.
+
+---
+
+## 4. SystemVerilog Assertions (SVA) Entegrasyonu
+
+Agent'lar sisteme milisaniyeler (timeout'lar) düzeyinde paket göderirken (Software), SVA modüllerimiz saniyenin milyarda biri düzeyinde (Hardware-Clock tick bazlı) devrede olup, donanımsal glitch'leri engellemektedir. Toplam **3 checker dosyasında**, **112 kural (Assertion)** ve **53 kapsam gözlemi (Cover Property)** bulunmaktadır.
+
+### 4.1. `chs_protocol_checker.sv` (21 Assertion)
+*   **Kategoriler:** JTAG, UART, SPI, I2C, GPIO temel donanım sinyalleri.
+*   **Örnek Kurallar:**
+    *   `a_reset_stable`: RST pini serbest bırakıldıktan sonra 4 clock çevkimi boyunca kararlı kalmak zorundadır (Glitch olamaz).
+    *   `a_spi_cs_mutex`: SPI seçici pinlerin (Chip Select) kesinlikle birden fazlası aynı anda HIGH olamaz (Short-circuit koruması).
+    *   `a_i2c_od_scl`: I2C Open-Drain çıkış kontrolü - Çıkış izni High ve data Low ise SCL mutlaka sıfırda olmalıdır.
+
+### 4.2. `chs_axi_protocol_checker.sv` (58 Assertion)
+*   **Kategoriler:** ARM AXI4 standartları spesifikasyon korumaları.
+*   **Örnek Kurallar:**
+    *   *Stability Kuralları:* `a_aw_valid_stable`, Pindeki Valid pini High olduysa Ready gelene kadar kesinlikle beklemesi (data droplanmaz).
+    *   *Timeout Liveness:* `a_aw_timeout`, Gönderilen komut asla tıkanamaz, en fazla 2000 cycle sonra yanıt vermek zorundadır.
+    *   *X/Z Çakışmaları:* Data ve Valid kanallarında tanımsız (X) veri olmasını yasaklar.
+
+### 4.3. `chs_soc_sva_checker.sv` (33 Assertion)
+*   **Kategoriler:** İşlemci spesifik (SBA, Interrupt, Bus Error, DMI) donanım uyumluluğu.
+*   **Örnek Kurallar:**
+    *   `a_sba_to_reg`: JTAG SBA arayüzünden yazılan bilgi, çipin merkezindeki Register Bus arayüzüne kesinlikle en fazla 100 cycle içerisinde ulaşıp işlem yapmalıdır (End-to-End Latency).
+    *   `a_boot_mode_stable`: Reset kalktıktan sonra cihazın boot modu asla sonradan değiştirilemez.
+
+---
+
+## 5. Proje Test Senaryoları Arşivi (Timeline)
+
+UVM projelerinde bir test sınıfı `uvm_test`ten kalıtım alır; timeout'unu ve kullanılacak bileşen şalterlerini berliler, ardından ana görevi bir **Sequence (Senaryo)** başlatmaktır. Projemizde aşama aşama kurgulanmış ve başarıyla koşturulan **36 Ana Test** bulunmaktadır.
+
+### Aşama 1–3: Single-Protocol Connectivity & Bring-Up (Basit Erişim)
+*Bu testler tek bir ajan kullanarak ortamın yaşayıp yaşamadığını kontrol ederler.*
+*   `chs_sanity_test` (10ms): JTAG ve GPIO ayağa kalkıyor mu?
+*   `chs_jtag_boot_test` (10ms): JTAG'in Boot işlemi doğrulaması.
+*   `chs_uart_test`, `chs_uart_tx_test`, `chs_uart_burst_test` (10ms): Kesintisiz ve rastgele uzunlukta byte gönderimi.
+*   `chs_spi_single_test`, `chs_spi_flash_test` (10ms): SPI transfer modeli kontrolü.
+*   `chs_i2c_write_test`, `chs_i2c_rd_test` (10ms): Temel I2C ACK/NACK yapısı.
+*   `chs_gpio_walk_test`, `chs_gpio_toggle_test` (10ms): Bitişik kayan 1'ler testi.
+
+### Aşama 3–4: SBA System Bus ve Cross-Protocol Tests (Ağ İçi Gezintiler)
+*Dışarıdan (JTAG) girip içerideki (AXI-RegBus) üzerinden başka bir modülü (UART/SPI) kontrol etme simülasyonlarıdır.*
+*   `chs_jtag_sba_test` (100ms): Çipin içine Memory Access testi.
+*   `chs_spi_sba_test`, `chs_i2c_sba_test`, `chs_gpio_deep_test` (50-100ms): SBA üzerinden SPI/I2C/GPIO Register'larına direkt yazım yapıp, pinden çıkan elektriksel dalgayı doğrulayan testler.
+*   `chs_stress_test` (100ms): 4 ajan aynı anda sürekli ve rastgele trafik yollarken SBA round-robin denemesi.
+
+### Aşama 5: SVA ve Total Coverage Baskısı
+*   `chs_sva_coverage_test` (200ms): Timeout değeri uzatılmış ve kasten uzun süreli veriler pompalayarak tüm Coverage listelerinde "Full 100%" Coverage bulmayı amaçlayan spesifik senaryo.
+
+### Aşama 6: Register Abstraction Layer (RAL) ve Error Enjeksiyonu
+*`has_ral=1` flag'i ile doğrudan UVM Register Modeline bağlanır (JTAG Base'den Address Offset girmek yerine doğrudan class tabanlı `.write()` işlemleri).*
+*   `chs_ral_access_test` (100ms): JTAG > DMI > SBA veriyolu ağacını, RAL Front-Door seviyesinde otomatik nesne yönelimli test eden senaryo.
+*   `chs_interrupt_test` (100ms): İç GPIO registerlarının interrupt tetikleyip tetiklemediğini deneyen yapı.
+*   `chs_error_inject_test` (150ms): Sisteme yasadışı talep girip dönen Error flaglerini `UVM_WARNING` düşürerek (Catcher ile) sistemi stres testinde hayatta tutan yapı.
+
+### Aşama 7: SoC-Level Integration ve Reset Kontrolleri
+*   `chs_memmap_test` (50ms): Çipin haritasındaki tüm hedeflere (ROM, PLIC vb) sondaj yapar.
+*   `chs_boot_seq_test` (50ms): JTAG üzerinden TAP Reset, Debugger Halt/Resume deneme testleri.
+*   `chs_reg_reset_test` (50ms): SBA ağından tüm IP modüllerinin POR (Power-on-Reset) değerlerini (Default Values) çeker.
+
+### Aşama 8: AXI Bus Monitoring (Core Traffic)
+*   `chs_axi_sanity_test` (10ms): AXI Ajanı aktif edilip CVA6 Boot işlemlerinin pasif olarak doğrulanması.
+*   `chs_axi_protocol_test` (3ms), `chs_axi_stress_test` (5ms): Aja ve CVA6 Master'ı eşzamanlı veri tıkanma testi denemeleri.
+
+### Aşama 9: Coverage Boost Testleri (Sınırları Cilasama Testleri)
+*Aşama 5'ten farklı olarak Covergroup'lardaki sınır (Boundary / Corner Case) değerleri tetiklemeyi asıl amaç edinen testler.*
+*   `chs_cov_jtag_corner_test`, `chs_cov_uart_boundary_test`, `chs_cov_gpio_exhaustive_test`, `chs_cov_axi_region_test` gibi spesifik "Boş bırakılmış maske tırmalama" testleridir. Çipi 200ms gibi uzun bloklar halinde test ederler.
+
+---
+
+## 6. Proje Dizin Mimarisi Referansı (verif/tb/)
+Özetle kod evreni şu şekildedir:
+*   `agents/`: Tekil birimlerin protokol işlemleri (JTAG, UART, AXI vb.)
+*   `env/`: `chs_env.sv`, `chs_scoreboard.sv`, `chs_coverage.sv`. Ve bunların içerisindeki RAL Modellerinin bağlandığı adres (`env/ral/chs_ral_soc_block.sv`).
+*   `sequences/`: 5 Adet Base IP Sequence ve **33 Adet Virtual Sequence** (sistem çaplı koordineli testler).
+*   `tests/`: Base test + 36 Adet koşan test senaryosu.
+*   `top/`: `tb_top.sv` ve içerisine eklenmiş **3 SVA Checker** dosyasının donanım arayüzleri.
+
+---
+
+## 7. Porting Kılavuzu: Yeni Bir Projeye Adaptasyon 
+
+Bugün sahip olduğumuz bu SoC iskeleti, ileride tasarımı tamamen belirsiz bir projeye entegre edileceğinde:
+1.  **%100 Aktarılacaklar:** `agents/` içindeki JTAG, SPI, I2C, UART paketi. İletişim standartları küresel sabit olduğundan direkt kopyalanır. Bize aylar kazandırır.
+2.  **Kısmen Aktarılacaklar:** `top/` sınıfının isimleri RTL'e göre değiştirilir. SVA parametreleri daraltılır veya genişletilir.
+3.  **Baştan Yazılacaklar:** `env/ral/` modülleri yeni çipin dökümanına (IP-XACT, Register Map Docs) göre oto-generate edilir. `sequences/virtual/` içerisine bu modele özel (yeni SoC'deki boot aşamaları gibi) senaryolar yazılır.
