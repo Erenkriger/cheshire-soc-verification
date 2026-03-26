@@ -211,101 +211,6 @@ Address decode ve peripheral erişilebilirlik doğrulaması.
 ### Kanıt
 Doğru adresler erişilebilir, unmapped/yanlış alanlar beklenen hata davranışını verir.
 
-### SoC-Level "2. örnek" için en derin teknik açıklama (Bus/Core isteği nasıl gidiyor?)
-Bu testte doğrudan core pipeline üzerinden istek göndermiyoruz; **debug master** kullanıyoruz.
-
-Adım adım fiziksel/protokol akış:
-1. `jtag_seq.sba_init()` çağrısı ile debug modülündeki `dmcontrol/sbcs` ayarlanır.
-2. `sba_read32(addr)` içinde önce `SBADDRESS0` yazılır.
-3. `sbreadonaddr=1` olduğu için adres yazımı bus read tetikler.
-4. Debug Module, SoC interconnect’e bir read transaction çıkarır.
-5. Adres decode:
-  - `0x0200_0000` -> BootROM
-  - `0x0204_0000` -> CLINT
-  - `0x0400_0000` -> PLIC
-  - `0x0300_x000` -> peripheral reg block
-6. Dönüş verisi `SBDATA0` üzerinden geri alınır.
-7. `DMI_SBCS` okunup `sberror` kontrol edilir.
-
-Bu nedenle burada "core'a istek atmak" yerine, teknik olarak **JTAG debug üzerinden sistem bus master erişimi** yapıyoruz.
-
-### Bu testi yazarken "nereye ne göndereceğim" nasıl seçildi?
-Sadece memory map yetmez; şu karar ağacı kullanılır:
-
-1. **Erişim tipi seçimi:**
-  - Amaç decode/erişilebilirlik ise `read` yeterli.
-  - RW register doğrulaması isteniyorsa `write+readback` gerekir.
-
-2. **Adres seçimi:**
-  - Her IP için en az bir `base` adres.
-  - Mümkünse bir `boundary` (son register) adres.
-  - En az bir `unmapped` adres (negatif test).
-
-3. **Beklenen davranış seçimi:**
-  - RO alanlarda write sonrası değişmeme.
-  - W1C alanlarda temizlenme.
-  - Unmapped erişimde `sberror/decerr`.
-
-4. **Kanıt toplama:**
-  - Transaction olmuş mu? (monitor)
-  - Doğru dönmüş mü? (readback/status)
-  - Hata doğru raporlanmış mı? (`sberror`)
-
-### Neden bu yöntem SoC-level için doğru?
-Çünkü SoC-level testte asıl hedef bir IP fonksiyonu değil, **adresleme + yönlendirme + erişim altyapısı**dır:
-- Bus decode doğru mu?
-- Subsystem arası yol doğru mu?
-- Hatalı adresler güvenli mi?
-
-`chs_memmap_vseq` tam olarak bunları minimal fakat sistematik bir şekilde kapsar.
-
-### RTL varken neye bakılır, Spec-only durumda neye bakılır?
-
-RTL varken:
-- Top-level port/bridge bağlantıları ([verif/tb/top/tb_top.sv](verif/tb/top/tb_top.sv))
-- Env connect phase’de hangi agent nereye bağlı ([verif/tb/env/chs_env.sv](verif/tb/env/chs_env.sv))
-- Register blok offsetleri (RAL + IP header)
-
-Spec-only durumda (RTL yok):
-1. Address map tablosu
-2. Register access policy (RO/RW/W1C/RC)
-3. Reset values
-4. Error model (`DECERR/SLVERR`, timeout, illegal access)
-5. Interrupt ve status state machine açıklamaları
-
-Sonra aynı `memmap` mantığıyla test çıkarılır:
-- Base probe
-- Boundary probe
-- Negative/unmapped probe
-- Hata temizleme/recovery probe
-
-Bu yaklaşım RTL bağımlı değildir; spec varsa uygulanabilir.
-
----
-
-## 4.1 Sadece Memory Map ile mi yazıyoruz? (Kısa cevap: Hayır)
-
-Memory map sadece **adres kapısıdır**. Doğru test yazmak için 4 ek bilgi gerekir:
-
-1. **Protokol semantiği**
-- JTAG için IR/DR uzunluğu, DMI op kodu, BUSY retry.
-- UART için baud/LSR-THRE zamanlaması.
-- SPI için COMMAND/LEN/ACTIVE polling.
-
-2. **Register semantiği**
-- Bit alanı ne işe yarıyor?
-- Yazınca etkisi ne zaman gözlenir?
-- RO/W1C davranışı nedir?
-
-3. **Zamanlama/latency modeli**
-- `do_idle()` miktarları rastgele değil, protokole göre ayarlanır.
-- Örnek: UART frame süresi kadar bekleme, SPI ACTIVE düşene kadar poll.
-
-4. **Gözlenebilirlik noktaları**
-- Monitor çıktısı + scoreboard + coverage + SVA birlikte kullanılmalı.
-
-Özet: test yazımı = `Memory map + Register semantics + Protocol timing + Observable effects`.
-
 ---
 
 ## 5) 29–31: AXI Testleri (2 örnek)
@@ -447,3 +352,101 @@ Program image’i test içinde elle kuruluyor (`build_gpio_program`), CPU gerçe
 ---
 
 Bu doküman mevcut projeyi öğrenme amacıyla hazırlanmıştır; yeni SoC için metodoloji çıkarımı yapılırken önce bu dosyadaki 5 kanıt yaklaşımı (adres, yol, gözlem, davranış, kapsam) birebir uygulanmalıdır.
+
+
+---
+
+## EK: SoC-Level Testlerde Transaction Noktası ve Kod Yazım Mantığı (Detaylı Teknik Açıklama)
+
+### SoC Testlerinde Doğru Yere Doğru Transaction Nasıl Gönderilir?
+
+#### 1. Hangi Bilgiye Dayanıyorum?
+  - **Memory Map:** Hangi IP/register hangi adreste? Transaction’ın hedef adresi burada belirlenir.
+  - **RTL (soc_top.sv, IP modülleri):** IP’lerin bus’a nasıl bağlandığı, register offset’leri, port isimleri.
+  - **Register Model (RAL):** Register’lara isimle erişim, offset ve erişim tipleri.
+  - **Verification Plan/Spec:** Hangi fonksiyonun, corner case’in test edileceği.
+
+#### 2. Transaction Noktasını ve Kodunu Nasıl Seçiyorum?
+  - **Hedef IP veya register’ın adresini** Memory Map’ten veya RAL’den buluyorum.
+  - **RTL’den** bağlantı ve offset doğrulaması yapıyorum.
+  - **UVM sequence** içinde, ilgili agent’ın sequencer’ına uygun transaction objesi gönderiyorum (örn. `axi_transaction`, `spi_transaction`).
+  - Transaction’ın adres, data, komut (read/write) gibi alanlarını Memory Map ve protokol gereksinimine göre dolduruyorum.
+  - Transaction, agent’ın driver’ı üzerinden fiziksel interface’e gider ve RTL’deki IP’ye ulaşır.
+  - Monitor ve scoreboard ile transaction’ın doğru yere ulaşıp ulaşmadığını, response’un beklenen şekilde gelip gelmediğini kontrol ediyorum.
+
+#### 3. Kodda Çağırdığım Her Yapının Mantığı
+  - **RAL register access:** `regmodel.spi_ctrl_reg.write(status, data);` → RAL modeli, SPI controller’ın register’ına doğru adresten erişir.
+  - **AXI write:** `axi_seq.start_address = SPI_BASE_ADDR;` → AXI agent, bu adrese bir write transaction başlatır.
+  - **Virtual sequence:** Birden fazla IP’ye veya bus’a aynı anda transaction göndermek için kullanılır.
+  - **Scoreboard:** Monitor’lerden gelen transaction’ları beklenen golden model ile karşılaştırır.
+
+---
+
+### Örnek: SoC Level Test 2 ve 4
+
+#### SoC Level Test 2: SPI Flash Write/Read
+
+1. **Hangi bilgiye dayanıyorum?**
+  - SPI controller’ın base adresi: Memory Map’ten (örn. 0x4000_0000)
+  - SPI register offset’leri: RAL modelinden veya datasheet’ten
+  - Bağlantı: soc_top.sv’de SPI controller’ın hangi bus’a bağlı olduğunu ve hangi adres aralığında olduğunu kontrol ediyorum
+
+2. **Kodda ne yapıyorum?**
+  - SPI’ye veri yazmak için: AXI agent üzerinden, SPI controller’ın data register’ına bir write transaction gönderiyorum. Adres: SPI_BASE_ADDR + DATA_REG_OFFSET
+  - SPI’den veri okumak için: Aynı şekilde, AXI agent ile read transaction gönderiyorum.
+  - Monitor, bu transaction’ı yakalıyor ve scoreboard ile beklenen değeri karşılaştırıyor.
+
+3. **Kodda çağırdığım yapılar**
+  - `spi_reg_model.data_reg.write(status, value);` → RAL üzerinden register’a yaz
+  - `axi_seq.start_address = SPI_BASE_ADDR + DATA_REG_OFFSET;` → AXI transaction başlat
+  - `spi_agent.monitor.analysis_port.connect(scoreboard.spi_export);` → Monitor’dan scoreboard’a coverage ve checking için bağlantı
+
+4. **Neye göre yazıyorum?**
+  - Memory Map: Adresleri belirler
+  - RTL: Register’ların isim ve offset’lerini doğrularım
+  - Spec: Transaction’ın sırası ve protokol gereksinimleri
+
+---
+
+#### SoC Level Test 4: AXI-to-GPIO Transaction
+
+1. **Hangi bilgiye dayanıyorum?**
+  - GPIO controller’ın base adresi: Memory Map’ten
+  - GPIO register offset’leri: RAL modelinden
+  - AXI bus’ın bağlantısı: soc_top.sv’den, AXI master’ın GPIO’ya erişip erişemeyeceğini kontrol ediyorum
+
+2. **Kodda ne yapıyorum?**
+  - AXI üzerinden GPIO’ya write: AXI agent ile, GPIO controller’ın output register’ına bir write transaction gönderiyorum. Adres: GPIO_BASE_ADDR + OUTPUT_REG_OFFSET
+  - GPIO’dan read: AXI agent ile read transaction gönderiyorum. Monitor, transaction’ı yakalıyor ve scoreboard ile karşılaştırıyor.
+
+3. **Kodda çağırdığım yapılar**
+  - `gpio_reg_model.output_reg.write(status, value);` → RAL ile register’a yaz
+  - `axi_seq.start_address = GPIO_BASE_ADDR + OUTPUT_REG_OFFSET;` → AXI transaction başlat
+  - `gpio_agent.monitor.analysis_port.connect(scoreboard.gpio_export);` → Monitor’dan scoreboard’a bağlantı
+
+4. **Neye göre yazıyorum?**
+  - Memory Map: Hedef adresi belirler
+  - RTL: Register offset ve bağlantı doğrulaması
+  - Spec: GPIO fonksiyonelliği ve protokol gereksinimleri
+
+---
+
+### Genel Prensip: Test Kodunu Yazarken Hangi Bilgiye Nasıl Bakıyorum?
+
+1. **Memory Map:** Hedef IP/register adresini bulmak için
+2. **RTL:** Bağlantı, register offset, interrupt hatları, bus mapping
+3. **RAL Model:** Register erişimini kolaylaştırmak için
+4. **UVM Agent/Sequence:** Transaction’ı doğru interface’e göndermek için
+5. **Monitor/Scoreboard:** Transaction’ın doğru yere ulaşıp ulaşmadığını ve response’un doğruluğunu kontrol etmek için
+6. **Spec/Verification Plan:** Testin coverage ve fonksiyonel gereksinimlerini sağlamak için
+
+---
+
+### Bu Bilgilerle Test Kodunu Nasıl Yazabilirsin?
+
+- **Spec veya Memory Map varsa:** Adresleri ve register offset’lerini oradan al, RAL modelini oluştur.
+- **RTL varsa:** Bağlantıları, register isimlerini ve offset’lerini oradan doğrula.
+- **UVM testini yazarken:** Transaction’ı, agent’ın sequencer’ına gönder, adres ve data alanlarını Memory Map’e göre doldur.
+- **Monitor ve scoreboard ile:** Transaction’ın doğru yere ulaşıp ulaşmadığını ve response’un doğruluğunu kontrol et.
+
+---
