@@ -211,6 +211,101 @@ Address decode ve peripheral erişilebilirlik doğrulaması.
 ### Kanıt
 Doğru adresler erişilebilir, unmapped/yanlış alanlar beklenen hata davranışını verir.
 
+### SoC-Level "2. örnek" için en derin teknik açıklama (Bus/Core isteği nasıl gidiyor?)
+Bu testte doğrudan core pipeline üzerinden istek göndermiyoruz; **debug master** kullanıyoruz.
+
+Adım adım fiziksel/protokol akış:
+1. `jtag_seq.sba_init()` çağrısı ile debug modülündeki `dmcontrol/sbcs` ayarlanır.
+2. `sba_read32(addr)` içinde önce `SBADDRESS0` yazılır.
+3. `sbreadonaddr=1` olduğu için adres yazımı bus read tetikler.
+4. Debug Module, SoC interconnect’e bir read transaction çıkarır.
+5. Adres decode:
+  - `0x0200_0000` -> BootROM
+  - `0x0204_0000` -> CLINT
+  - `0x0400_0000` -> PLIC
+  - `0x0300_x000` -> peripheral reg block
+6. Dönüş verisi `SBDATA0` üzerinden geri alınır.
+7. `DMI_SBCS` okunup `sberror` kontrol edilir.
+
+Bu nedenle burada "core'a istek atmak" yerine, teknik olarak **JTAG debug üzerinden sistem bus master erişimi** yapıyoruz.
+
+### Bu testi yazarken "nereye ne göndereceğim" nasıl seçildi?
+Sadece memory map yetmez; şu karar ağacı kullanılır:
+
+1. **Erişim tipi seçimi:**
+  - Amaç decode/erişilebilirlik ise `read` yeterli.
+  - RW register doğrulaması isteniyorsa `write+readback` gerekir.
+
+2. **Adres seçimi:**
+  - Her IP için en az bir `base` adres.
+  - Mümkünse bir `boundary` (son register) adres.
+  - En az bir `unmapped` adres (negatif test).
+
+3. **Beklenen davranış seçimi:**
+  - RO alanlarda write sonrası değişmeme.
+  - W1C alanlarda temizlenme.
+  - Unmapped erişimde `sberror/decerr`.
+
+4. **Kanıt toplama:**
+  - Transaction olmuş mu? (monitor)
+  - Doğru dönmüş mü? (readback/status)
+  - Hata doğru raporlanmış mı? (`sberror`)
+
+### Neden bu yöntem SoC-level için doğru?
+Çünkü SoC-level testte asıl hedef bir IP fonksiyonu değil, **adresleme + yönlendirme + erişim altyapısı**dır:
+- Bus decode doğru mu?
+- Subsystem arası yol doğru mu?
+- Hatalı adresler güvenli mi?
+
+`chs_memmap_vseq` tam olarak bunları minimal fakat sistematik bir şekilde kapsar.
+
+### RTL varken neye bakılır, Spec-only durumda neye bakılır?
+
+RTL varken:
+- Top-level port/bridge bağlantıları ([verif/tb/top/tb_top.sv](verif/tb/top/tb_top.sv))
+- Env connect phase’de hangi agent nereye bağlı ([verif/tb/env/chs_env.sv](verif/tb/env/chs_env.sv))
+- Register blok offsetleri (RAL + IP header)
+
+Spec-only durumda (RTL yok):
+1. Address map tablosu
+2. Register access policy (RO/RW/W1C/RC)
+3. Reset values
+4. Error model (`DECERR/SLVERR`, timeout, illegal access)
+5. Interrupt ve status state machine açıklamaları
+
+Sonra aynı `memmap` mantığıyla test çıkarılır:
+- Base probe
+- Boundary probe
+- Negative/unmapped probe
+- Hata temizleme/recovery probe
+
+Bu yaklaşım RTL bağımlı değildir; spec varsa uygulanabilir.
+
+---
+
+## 4.1 Sadece Memory Map ile mi yazıyoruz? (Kısa cevap: Hayır)
+
+Memory map sadece **adres kapısıdır**. Doğru test yazmak için 4 ek bilgi gerekir:
+
+1. **Protokol semantiği**
+- JTAG için IR/DR uzunluğu, DMI op kodu, BUSY retry.
+- UART için baud/LSR-THRE zamanlaması.
+- SPI için COMMAND/LEN/ACTIVE polling.
+
+2. **Register semantiği**
+- Bit alanı ne işe yarıyor?
+- Yazınca etkisi ne zaman gözlenir?
+- RO/W1C davranışı nedir?
+
+3. **Zamanlama/latency modeli**
+- `do_idle()` miktarları rastgele değil, protokole göre ayarlanır.
+- Örnek: UART frame süresi kadar bekleme, SPI ACTIVE düşene kadar poll.
+
+4. **Gözlenebilirlik noktaları**
+- Monitor çıktısı + scoreboard + coverage + SVA birlikte kullanılmalı.
+
+Özet: test yazımı = `Memory map + Register semantics + Protocol timing + Observable effects`.
+
 ---
 
 ## 5) 29–31: AXI Testleri (2 örnek)
