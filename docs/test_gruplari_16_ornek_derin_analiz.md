@@ -14,7 +14,7 @@ Kapsam:
 
 ---
 
-## 0) Önce temel mekanizma (Gemini’da sorduğun ana soruların ortak cevabı)
+## 0) Temel Mekanizma
 
 ### 0.1 Test → Virtual Sequence → IP Sequence hiyerarşisi
 - Test sınıfı: senaryo seçer ve başlatır.
