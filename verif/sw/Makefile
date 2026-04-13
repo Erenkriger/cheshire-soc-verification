@@ -51,13 +51,14 @@ ELFS  := $(addprefix $(BUILD_DIR)/, $(addsuffix .elf, $(TESTS)))
 DUMPS := $(addprefix $(BUILD_DIR)/, $(addsuffix .dump, $(TESTS)))
 BINS  := $(addprefix $(BUILD_DIR)/, $(addsuffix .bin, $(TESTS)))
 MEMHS := $(addprefix $(BUILD_DIR)/, $(addsuffix .memh, $(TESTS)))
+WORDS := $(addprefix $(BUILD_DIR)/, $(addsuffix .words, $(TESTS)))
 
 # ═══════════════════════════════════════════════
 # Default target
 # ═══════════════════════════════════════════════
 .PHONY: all clean dump sizes help
 
-all: $(ELFS) $(DUMPS) $(MEMHS)
+all: $(ELFS) $(DUMPS) $(MEMHS) $(WORDS)
 	@echo ""
 	@echo "═══════════════════════════════════════"
 	@echo "  Build Complete: $(words $(ELFS)) tests"
@@ -85,6 +86,11 @@ $(BUILD_DIR)/%.dump: $(BUILD_DIR)/%.elf
 $(BUILD_DIR)/%.bin: $(BUILD_DIR)/%.elf
 	@echo "[BIN]   $< → $@"
 	$(OBJCOPY) -O binary $< $@
+
+# ─── Generate plain 32-bit word list (for UVM SW-driven loader) ───
+$(BUILD_DIR)/%.words: $(BUILD_DIR)/%.bin
+	@echo "[WORDS] $< → $@"
+	od -An -tx4 -w4 -v $< | tr -s ' ' '\n' | sed '/^$$/d' > $@
 
 # ─── Generate Verilog hex (for $readmemh) ───
 $(BUILD_DIR)/%.memh: $(BUILD_DIR)/%.elf
@@ -125,4 +131,6 @@ help:
 	@echo "  make clean   Remove build artifacts"
 	@echo "  make sizes   Show binary sizes"
 	@echo "  make dump    Show disassemblies"
+	@echo "  make test_x  Build .elf/.dump/.memh for one test"
+	@echo "  make all     Also generates .words files for UVM SW loader"
 	@echo "  make help    This message"

@@ -36,7 +36,7 @@ class chs_periph_stress_vseq extends uvm_sequence;
     localparam bit [31:0] GPIO_DIRECT_OUT  = GPIO_BASE + 32'h14;
     localparam bit [31:0] UART_SCR         = UART_BASE + 32'h1C;  // Scratch register (RW)
     localparam bit [31:0] SPI_CSID         = SPI_BASE  + 32'h24;
-    localparam bit [31:0] I2C_CTRL         = I2C_BASE  + 32'h04;
+    localparam bit [31:0] I2C_CTRL         = I2C_BASE  + 32'h10;
 
     function new(string name = "chs_periph_stress_vseq");
         super.new(name);
@@ -85,7 +85,7 @@ class chs_periph_stress_vseq extends uvm_sequence;
             total_ops++;
 
             // I2C status read
-            jtag_seq.sba_read32(I2C_BASE + 32'h08, rdata, p_sequencer.m_jtag_sqr);
+            jtag_seq.sba_read32(I2C_BASE + 32'h14, rdata, p_sequencer.m_jtag_sqr);
             total_ops++;
         end
         `uvm_info(get_type_name(), $sformatf("  Phase 1 complete: %0d ops", total_ops), UVM_LOW)
@@ -213,7 +213,7 @@ class chs_periph_stress_vseq extends uvm_sequence;
             `uvm_info(get_type_name(), $sformatf("  SPI CSID: 0x%08h ✓", rdata), UVM_LOW)
 
             // I2C Status (read-only check)
-            jtag_seq.sba_read32(I2C_BASE + 32'h08, rdata, p_sequencer.m_jtag_sqr);
+            jtag_seq.sba_read32(I2C_BASE + 32'h14, rdata, p_sequencer.m_jtag_sqr);
             total_ops++;
             `uvm_info(get_type_name(), $sformatf("  I2C STATUS: 0x%08h ✓", rdata), UVM_LOW)
         end

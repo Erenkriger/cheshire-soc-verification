@@ -4,12 +4,12 @@
 // ============================================================================
 // chs_sw_gpio_test.sv — SW-Driven GPIO Test
 //
-// Loads a hand-assembled GPIO firmware into SPM via JTAG SBA, then lets
+// Loads a hand-assembled GPIO firmware into DRAM via JTAG SBA, then lets
 // the CVA6 execute it. The firmware writes several patterns to GPIO_OUT
 // and signals EOC=PASS to SCRATCH[2].
 //
 // Full data path exercised:
-//   JTAG → DMI → SBA → SPM → CVA6 pipeline → APB bus → GPIO registers
+//   JTAG → DMI → SBA → DRAM → CVA6 pipeline → APB bus → GPIO registers
 //
 // This is a true "Software-Driven Verification" scenario — the DUT
 // processor executes real firmware that drives its own peripherals.
@@ -52,8 +52,8 @@ class chs_sw_gpio_test extends chs_base_test;
     //   x30 (t5) = REGS_BASE = 0x03000000
     //
     // GPIO register offsets from GPIO_BASE:
-    //   +0x08 = GPIO_OUTPUT_EN  (write 1 = output mode)
-    //   +0x0C = GPIO_OUTPUT_VAL (write pattern here)
+    //   +0x20 = GPIO_OUTPUT_EN  (write 1 = output mode)
+    //   +0x14 = GPIO_OUTPUT_VAL (write pattern here)
     //
     // SCRATCH[2] at REGS_BASE + 0x08 = 0x03000008
     //   Write (retval<<1)|1 to signal EOC; for pass: write 1
@@ -77,27 +77,27 @@ class chs_sw_gpio_test extends chs_base_test;
 
         // ─── GPIO_OE = 0xFFFFFFFF (enable all outputs) ───
         vseq.program_image[i++] = 32'hFFF00293;   // addi  t0(x5), x0, -1      ; t0 = 0xFFFFFFFF
-        vseq.program_image[i++] = 32'h00532423;   // sw    t0, 8(t1)           ; GPIO_OE = all
+        vseq.program_image[i++] = 32'h02532023;   // sw    t0, 32(t1)          ; GPIO_OE = all
 
         // ─── Pattern 1: GPIO_OUT = 0x01 ───
         vseq.program_image[i++] = 32'h00100293;   // addi  t0, x0, 1
-        vseq.program_image[i++] = 32'h00532623;   // sw    t0, 12(t1)          ; GPIO_OUT
+        vseq.program_image[i++] = 32'h00532A23;   // sw    t0, 20(t1)          ; GPIO_OUT
 
         // ─── Pattern 2: GPIO_OUT = 0x02 ───
         vseq.program_image[i++] = 32'h00200293;   // addi  t0, x0, 2
-        vseq.program_image[i++] = 32'h00532623;   // sw    t0, 12(t1)
+        vseq.program_image[i++] = 32'h00532A23;   // sw    t0, 20(t1)
 
         // ─── Pattern 3: GPIO_OUT = 0x04 ───
         vseq.program_image[i++] = 32'h00400293;   // addi  t0, x0, 4
-        vseq.program_image[i++] = 32'h00532623;   // sw    t0, 12(t1)
+        vseq.program_image[i++] = 32'h00532A23;   // sw    t0, 20(t1)
 
         // ─── Pattern 4: GPIO_OUT = 0x00 (all zeros) ───
         vseq.program_image[i++] = 32'h00000293;   // addi  t0, x0, 0
-        vseq.program_image[i++] = 32'h00532623;   // sw    t0, 12(t1)
+        vseq.program_image[i++] = 32'h00532A23;   // sw    t0, 20(t1)
 
         // ─── Pattern 5: GPIO_OUT = 0xFF ───
         vseq.program_image[i++] = 32'h0FF00293;   // addi  t0, x0, 0xFF
-        vseq.program_image[i++] = 32'h00532623;   // sw    t0, 12(t1)
+        vseq.program_image[i++] = 32'h00532A23;   // sw    t0, 20(t1)
 
         // ─── EOC: SCRATCH[2] = 1 (pass, exit_code=0) ───
         vseq.program_image[i++] = 32'h00100293;   // addi  t0, x0, 1           ; t0 = 1

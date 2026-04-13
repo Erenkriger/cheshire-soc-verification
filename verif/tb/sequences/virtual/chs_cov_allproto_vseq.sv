@@ -120,11 +120,11 @@ class chs_cov_allproto_vseq extends uvm_sequence;
         // Phase 1: GPIO — Quick setup + patterns
         // ═══════════════════════════════════════════════════════
         `uvm_info(get_type_name(), "[1/5] GPIO Activation", UVM_LOW)
-        sba_write32(GPIO_BASE + 32'h08, 32'hFFFF_FFFF);  // All output
+        sba_write32(GPIO_BASE + 32'h20, 32'hFFFF_FFFF);  // All output
         do_idle(3);
-        sba_write32(GPIO_BASE + 32'h04, 32'h5555_5555);  // Checkerboard
+        sba_write32(GPIO_BASE + 32'h14, 32'h5555_5555);  // Checkerboard
         do_idle(3);
-        sba_write32(GPIO_BASE + 32'h04, 32'hAAAA_AAAA);
+        sba_write32(GPIO_BASE + 32'h14, 32'hAAAA_AAAA);
         do_idle(3);
 
         // ═══════════════════════════════════════════════════════
@@ -153,25 +153,25 @@ class chs_cov_allproto_vseq extends uvm_sequence;
         // SPI Host enable + CONFIGOPTS
         sba_write32(SPI_BASE + 32'h10, 32'h8000_0001);
         do_idle(3);
-        sba_write32(SPI_BASE + 32'h14, 32'h0018_0000);  // CONFIGOPTS: clkdiv=24
+        sba_write32(SPI_BASE + 32'h18, 32'h0018_0000);  // CONFIGOPTS: clkdiv=24
         do_idle(3);
 
         // JEDEC Read ID (0x9F) — single byte TX
         sba_write32(SPI_BASE + 32'h24, 32'h0000_0000);  // CSID=0
-        sba_write32(SPI_BASE + 32'h1C, {24'h0, 8'h9F});  // TXDATA
+        sba_write32(SPI_BASE + 32'h30, {24'h0, 8'h9F});  // TXDATA
         do_idle(3);
         // COMMAND: 1 byte TX, speed=standard, direction=TX, csaat=1
-        sba_write32(SPI_BASE + 32'h18, {4'b0, 9'd7, 2'b01, 1'b0, 2'b01, 1'b1, 1'b0, 12'h004});
+        sba_write32(SPI_BASE + 32'h28, {4'b0, 9'd7, 2'b01, 1'b0, 2'b01, 1'b1, 1'b0, 12'h004});
         do_idle(1500);
 
         // Multi-byte TX (4 bytes) for medium_tr bin
-        sba_write32(SPI_BASE + 32'h1C, 32'hDEAD_BEEF);
+        sba_write32(SPI_BASE + 32'h30, 32'hDEAD_BEEF);
         do_idle(3);
-        sba_write32(SPI_BASE + 32'h18, {4'b0, 9'd31, 2'b01, 1'b0, 2'b01, 1'b1, 1'b0, 12'h004});
+        sba_write32(SPI_BASE + 32'h28, {4'b0, 9'd31, 2'b01, 1'b0, 2'b01, 1'b1, 1'b0, 12'h004});
         do_idle(3000);
 
         // Deassert CS
-        sba_write32(SPI_BASE + 32'h18, {4'b0, 9'd7, 2'b01, 1'b0, 2'b01, 1'b0, 1'b0, 12'h004});
+        sba_write32(SPI_BASE + 32'h28, {4'b0, 9'd7, 2'b01, 1'b0, 2'b01, 1'b0, 1'b0, 12'h004});
         do_idle(1500);
 
         // ═══════════════════════════════════════════════════════
@@ -179,13 +179,13 @@ class chs_cov_allproto_vseq extends uvm_sequence;
         // ═══════════════════════════════════════════════════════
         `uvm_info(get_type_name(), "[4/5] I2C Activation", UVM_LOW)
         // Enable I2C
-        sba_write32(I2C_BASE + 32'h18, 32'h0000_0001);
+        sba_write32(I2C_BASE + 32'h10, 32'h0000_0001);
         do_idle(3);
         // Timing: SCL period ~100kHz
-        sba_write32(I2C_BASE + 32'h00, {16'h0, 16'd250});
-        sba_write32(I2C_BASE + 32'h04, {16'd250, 16'd250});
-        sba_write32(I2C_BASE + 32'h08, {16'd250, 16'd250});
-        sba_write32(I2C_BASE + 32'h0C, {16'h0, 16'd5});
+        sba_write32(I2C_BASE + 32'h30, {16'h0, 16'd250});
+        sba_write32(I2C_BASE + 32'h34, {16'd250, 16'd250});
+        sba_write32(I2C_BASE + 32'h38, {16'd250, 16'd250});
+        sba_write32(I2C_BASE + 32'h3C, {16'h0, 16'd5});
         do_idle(5);
 
         // FDATA: START + addr 0x50 + W
@@ -216,14 +216,14 @@ class chs_cov_allproto_vseq extends uvm_sequence;
         // Rapid GPIO→UART→SPI→I2C alternation
         for (i = 0; i < 3; i++) begin
             // GPIO
-            sba_write32(GPIO_BASE + 32'h04, 32'h0000_0001 << i);
+            sba_write32(GPIO_BASE + 32'h14, 32'h0000_0001 << i);
             do_idle(3);
             // UART
             sba_write32(UART_BASE, {24'h0, 8'h30 + i[7:0]});
             do_idle(3000);
             // SPI
-            sba_write32(SPI_BASE + 32'h1C, {24'h0, 8'hA0 + i[7:0]});
-            sba_write32(SPI_BASE + 32'h18, {4'b0, 9'd7, 2'b01, 1'b0, 2'b01, 1'b1, 1'b0, 12'h004});
+            sba_write32(SPI_BASE + 32'h30, {24'h0, 8'hA0 + i[7:0]});
+            sba_write32(SPI_BASE + 32'h28, {4'b0, 9'd7, 2'b01, 1'b0, 2'b01, 1'b1, 1'b0, 12'h004});
             do_idle(1500);
             // I2C — keep re-sending FDATA
             sba_write32(I2C_BASE + 32'h1C, {19'b0, 1'b1, 1'b0, 1'b1, 1'b0, 1'b0, 8'hA0});
@@ -231,7 +231,7 @@ class chs_cov_allproto_vseq extends uvm_sequence;
         end
 
         // Final GPIO writes
-        sba_write32(GPIO_BASE + 32'h04, 32'h0000_0000);
+        sba_write32(GPIO_BASE + 32'h14, 32'h0000_0000);
         do_idle(5);
 
         `uvm_info(get_type_name(), "===== All-Protocol Coverage Boost COMPLETE =====", UVM_LOW)

@@ -41,8 +41,8 @@ class chs_concurrent_vseq extends uvm_sequence;
     localparam bit [31:0] SPI_STATUS     = SPI_BASE + 32'h14;
 
     // I2C offsets
-    localparam bit [31:0] I2C_CTRL   = I2C_BASE + 32'h04;
-    localparam bit [31:0] I2C_STATUS = I2C_BASE + 32'h08;
+    localparam bit [31:0] I2C_CTRL   = I2C_BASE + 32'h10;
+    localparam bit [31:0] I2C_STATUS = I2C_BASE + 32'h14;
 
     function new(string name = "chs_concurrent_vseq");
         super.new(name);

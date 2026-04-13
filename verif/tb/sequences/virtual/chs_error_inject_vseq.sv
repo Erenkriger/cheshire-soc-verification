@@ -107,8 +107,8 @@ class chs_error_inject_vseq extends uvm_sequence;
         test_cnt++;
         begin
             // Enable all SPI error types
-            jtag_seq.sba_write32(SPI_BASE + 32'h38, 32'h0000_000F, p_sequencer.m_jtag_sqr);
-            jtag_seq.sba_read32(SPI_BASE + 32'h38, rdata, p_sequencer.m_jtag_sqr);
+            jtag_seq.sba_write32(SPI_BASE + 32'h34, 32'h0000_000F, p_sequencer.m_jtag_sqr);
+            jtag_seq.sba_read32(SPI_BASE + 32'h34, rdata, p_sequencer.m_jtag_sqr);
             `uvm_info(get_type_name(), $sformatf("  SPI ERR_ENABLE = 0x%08h", rdata), UVM_LOW)
 
             // Read SPI status to see if any errors flagged
@@ -126,21 +126,21 @@ class chs_error_inject_vseq extends uvm_sequence;
         test_cnt++;
         begin
             // Enable I2C host mode
-            jtag_seq.sba_write32(I2C_BASE + 32'h04, 32'h01, p_sequencer.m_jtag_sqr);
+            jtag_seq.sba_write32(I2C_BASE + 32'h10, 32'h01, p_sequencer.m_jtag_sqr);
 
             // Configure timing
-            jtag_seq.sba_write32(I2C_BASE + 32'h7C, 32'h0064_0064, p_sequencer.m_jtag_sqr);
+            jtag_seq.sba_write32(I2C_BASE + 32'h30, 32'h0064_0064, p_sequencer.m_jtag_sqr);
 
             // Write to FMTFIFO with NAKOK=1 (tolerate NACK) + START + STOP
             // Address byte = 0xFE (likely no device at this addr) with NAKOK
-            jtag_seq.sba_write32(I2C_BASE + 32'h24, 32'h0000_13FE, p_sequencer.m_jtag_sqr);
+            jtag_seq.sba_write32(I2C_BASE + 32'h1C, 32'h0000_13FE, p_sequencer.m_jtag_sqr);
             `uvm_info(get_type_name(), "  I2C FMTFIFO: addr=0xFE, START+STOP+NAKOK", UVM_MEDIUM)
 
             // Wait for I2C transaction
             jtag_seq.do_idle(100, p_sequencer.m_jtag_sqr);
 
             // Read I2C status
-            jtag_seq.sba_read32(I2C_BASE + 32'h08, rdata, p_sequencer.m_jtag_sqr);
+            jtag_seq.sba_read32(I2C_BASE + 32'h14, rdata, p_sequencer.m_jtag_sqr);
             `uvm_info(get_type_name(), $sformatf("  I2C STATUS = 0x%08h", rdata), UVM_LOW)
 
             pass_cnt++;

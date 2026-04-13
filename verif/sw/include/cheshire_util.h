@@ -21,7 +21,7 @@
 #define USB_BASE       0x03008000UL   // USB OHCI controller
 #define CLINT_BASE     0x02040000UL   // CLINT (timer/SW interrupts)
 #define PLIC_BASE      0x04000000UL   // PLIC (interrupt controller)
-#define SPM_BASE       0x10000000UL   // Scratchpad Memory (64 KiB)
+#define SPM_BASE       0x10000000UL   // LLC SPM window (64 MiB)
 #define DRAM_BASE      0x80000000UL   // External DRAM (via LLC)
 #define BOOTROM_BASE   0x02000000UL   // Boot ROM
 
@@ -58,12 +58,20 @@
 // ═══════════════════════════════════════════════
 // GPIO Registers
 // ═══════════════════════════════════════════════
-#define GPIO_DATA_IN      0x00
-#define GPIO_DIRECT_OUT   0x04
-#define GPIO_DIRECT_OE    0x08
-#define GPIO_INTR_EN_RISE 0x18
-#define GPIO_INTR_EN_FALL 0x1C
-#define GPIO_INTR_STATE   0x24
+#define GPIO_DATA_IN      0x10
+#define GPIO_DIRECT_OUT   0x14
+#define GPIO_MASKED_OUT_LO 0x18
+#define GPIO_MASKED_OUT_HI 0x1C
+#define GPIO_DIRECT_OE    0x20
+#define GPIO_MASKED_OE_LO 0x24
+#define GPIO_MASKED_OE_HI 0x28
+#define GPIO_INTR_STATE   0x00
+#define GPIO_INTR_EN      0x04
+#define GPIO_INTR_TEST    0x08
+#define GPIO_INTR_EN_RISE 0x2C
+#define GPIO_INTR_EN_FALL 0x30
+#define GPIO_INTR_EN_LVLH 0x34
+#define GPIO_INTR_EN_LVLL 0x38
 
 // ═══════════════════════════════════════════════
 // SPI Host Registers (OpenTitan SPI Host)
@@ -71,20 +79,42 @@
 #define SPI_CTRL        0x10
 #define SPI_STATUS      0x14
 #define SPI_CONFIGOPTS0 0x18
-#define SPI_CSID        0x1C
-#define SPI_COMMAND     0x20
-#define SPI_TXDATA      0x28
+#define SPI_CSID        0x24
+#define SPI_COMMAND     0x28
 #define SPI_RXDATA      0x2C
+#define SPI_TXDATA      0x30
+#define SPI_ERR_ENABLE  0x34
+#define SPI_ERR_STATUS  0x38
+#define SPI_EVT_ENABLE  0x3C
 #define SPI_CONTROL     0x10
+
+#define SPI_STATUS_RXEMPTY (1u << 24)
+#define SPI_STATUS_TXEMPTY (1u << 28)
+#define SPI_STATUS_ACTIVE  (1u << 30)
+#define SPI_STATUS_READY   (1u << 31)
 
 // ═══════════════════════════════════════════════
 // I2C Registers (OpenTitan I2C)
 // ═══════════════════════════════════════════════
-#define I2C_CTRL      0x04
-#define I2C_STATUS    0x08
-#define I2C_FDATA     0x18
-#define I2C_TIMING0   0x10
-#define I2C_TIMING1   0x14
+#define I2C_INTR_STATE 0x00
+#define I2C_INTR_EN   0x04
+#define I2C_CTRL      0x10
+#define I2C_STATUS    0x14
+#define I2C_RXFIFO    0x18
+#define I2C_FMTFIFO   0x1C
+#define I2C_FIFO_CTRL 0x20
+#define I2C_FIFO_STATUS 0x24
+#define I2C_OVRD      0x28
+#define I2C_VAL       0x2C
+#define I2C_TIMING0   0x30
+#define I2C_TIMING1   0x34
+#define I2C_TIMING2   0x38
+#define I2C_TIMING3   0x3C
+#define I2C_TIMING4   0x40
+#define I2C_TIMEOUT_CTRL 0x44
+
+#define I2C_STATUS_FMTEMPTY (1u << 2)
+#define I2C_STATUS_HOSTIDLE (1u << 3)
 
 // ═══════════════════════════════════════════════
 // MMIO Access Macros

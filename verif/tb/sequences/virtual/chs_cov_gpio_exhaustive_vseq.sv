@@ -78,8 +78,8 @@ class chs_cov_gpio_exhaustive_vseq extends uvm_sequence;
 
     // GPIO register addresses (OpenTitan GPIO)
     localparam bit [31:0] GPIO_BASE    = 32'h0300_5000;
-    localparam bit [31:0] GPIO_OUT     = 32'h0300_5004;  // DIRECT_OUT (offset 0x14 → mapped via regbus)
-    localparam bit [31:0] GPIO_OE      = 32'h0300_5008;  // DIRECT_OE  (offset 0x20)
+    localparam bit [31:0] GPIO_OUT     = 32'h0300_5014;  // DIRECT_OUT (offset 0x14)
+    localparam bit [31:0] GPIO_OE      = 32'h0300_5020;  // DIRECT_OE  (offset 0x20)
 
     task gpio_set_oe(bit [31:0] oe);
         sba_write32(GPIO_OE, oe);

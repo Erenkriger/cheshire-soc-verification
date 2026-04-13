@@ -140,49 +140,49 @@ class chs_coverage_drive_vseq extends uvm_sequence;
         `uvm_info(get_type_name(), "[2/5] GPIO Coverage Patterns", UVM_LOW)
 
         // Set all 32 GPIO as output
-        sba_write32(32'h0300_5008, 32'hFFFF_FFFF);
+        sba_write32(32'h0300_5020, 32'hFFFF_FFFF);
         do_idle(5);
 
         // All-zero
-        sba_write32(32'h0300_5004, 32'h0000_0000);
+        sba_write32(32'h0300_5014, 32'h0000_0000);
         do_idle(5);
 
         // All-one
-        sba_write32(32'h0300_5004, 32'hFFFF_FFFF);
+        sba_write32(32'h0300_5014, 32'hFFFF_FFFF);
         do_idle(5);
 
         // Checkerboard patterns
-        sba_write32(32'h0300_5004, 32'h5555_5555);
+        sba_write32(32'h0300_5014, 32'h5555_5555);
         do_idle(5);
-        sba_write32(32'h0300_5004, 32'hAAAA_AAAA);
+        sba_write32(32'h0300_5014, 32'hAAAA_AAAA);
         do_idle(5);
 
         // Walking ones (first 4 bits)
-        sba_write32(32'h0300_5004, 32'h0000_0001);
+        sba_write32(32'h0300_5014, 32'h0000_0001);
         do_idle(3);
-        sba_write32(32'h0300_5004, 32'h0000_0002);
+        sba_write32(32'h0300_5014, 32'h0000_0002);
         do_idle(3);
-        sba_write32(32'h0300_5004, 32'h0000_0004);
+        sba_write32(32'h0300_5014, 32'h0000_0004);
         do_idle(3);
-        sba_write32(32'h0300_5004, 32'h0000_0008);
+        sba_write32(32'h0300_5014, 32'h0000_0008);
         do_idle(3);
 
         // Half patterns (for en_pattern cross coverage)
-        sba_write32(32'h0300_5008, 32'h0000_FFFF);
-        sba_write32(32'h0300_5004, 32'hDEAD_BEEF);
+        sba_write32(32'h0300_5020, 32'h0000_FFFF);
+        sba_write32(32'h0300_5014, 32'hDEAD_BEEF);
         do_idle(5);
 
-        sba_write32(32'h0300_5008, 32'hFFFF_0000);
-        sba_write32(32'h0300_5004, 32'hCAFE_BABE);
+        sba_write32(32'h0300_5020, 32'hFFFF_0000);
+        sba_write32(32'h0300_5014, 32'hCAFE_BABE);
         do_idle(5);
 
         // Lower byte only
-        sba_write32(32'h0300_5008, 32'h0000_00FF);
-        sba_write32(32'h0300_5004, 32'h0000_0055);
+        sba_write32(32'h0300_5020, 32'h0000_00FF);
+        sba_write32(32'h0300_5014, 32'h0000_0055);
         do_idle(5);
 
         // Restore all output
-        sba_write32(32'h0300_5008, 32'hFFFF_FFFF);
+        sba_write32(32'h0300_5020, 32'hFFFF_FFFF);
         do_idle(3);
 
         // ─── Phase 3: UART Coverage Patterns ───
@@ -226,30 +226,30 @@ class chs_coverage_drive_vseq extends uvm_sequence;
         // Enable SPI Host
         sba_write32(32'h0300_4000 + 32'h10, 32'h8000_0001);
         do_idle(3);
-        sba_write32(32'h0300_4000 + 32'h14, 32'h0018_0000);
+        sba_write32(32'h0300_4000 + 32'h18, 32'h0018_0000);
         do_idle(3);
 
         // Single-byte transfer
-        sba_write32(32'h0300_4000 + 32'h1C, 32'h0000_0042);
+        sba_write32(32'h0300_4000 + 32'h30, 32'h0000_0042);
         do_idle(3);
-        sba_write32(32'h0300_4000 + 32'h18, {4'b0, 9'd7, 2'b01, 1'b0, 2'b01, 1'b1, 1'b0, 12'h004});
+        sba_write32(32'h0300_4000 + 32'h28, {4'b0, 9'd7, 2'b01, 1'b0, 2'b01, 1'b1, 1'b0, 12'h004});
         do_idle(1000);
 
         // 4-byte transfer
-        sba_write32(32'h0300_4000 + 32'h1C, 32'hCAFE_BABE);
+        sba_write32(32'h0300_4000 + 32'h30, 32'hCAFE_BABE);
         do_idle(3);
-        sba_write32(32'h0300_4000 + 32'h18, {4'b0, 9'd31, 2'b01, 1'b0, 2'b01, 1'b1, 1'b0, 12'h004});
+        sba_write32(32'h0300_4000 + 32'h28, {4'b0, 9'd31, 2'b01, 1'b0, 2'b01, 1'b1, 1'b0, 12'h004});
         do_idle(2000);
 
         // ─── Phase 5: I2C Coverage (write attempt) ───
         `uvm_info(get_type_name(), "[5/5] I2C Coverage", UVM_LOW)
 
         // Configure I2C timing
-        sba_write32(32'h0300_3000 + 32'h18, 32'h0000_0001);
-        sba_write32(32'h0300_3000 + 32'h00, {16'h0, 16'd250});
-        sba_write32(32'h0300_3000 + 32'h04, {16'd250, 16'd250});
-        sba_write32(32'h0300_3000 + 32'h08, {16'd250, 16'd250});
-        sba_write32(32'h0300_3000 + 32'h0C, {16'h0, 16'd5});
+        sba_write32(32'h0300_3000 + 32'h10, 32'h0000_0001);
+        sba_write32(32'h0300_3000 + 32'h30, {16'h0, 16'd250});
+        sba_write32(32'h0300_3000 + 32'h34, {16'd250, 16'd250});
+        sba_write32(32'h0300_3000 + 32'h38, {16'd250, 16'd250});
+        sba_write32(32'h0300_3000 + 32'h3C, {16'h0, 16'd5});
         do_idle(5);
 
         // Write FDATA: START + address 0x50 + W

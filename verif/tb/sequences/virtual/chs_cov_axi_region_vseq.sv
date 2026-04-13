@@ -175,7 +175,7 @@ class chs_cov_axi_region_vseq extends uvm_sequence;
         // I2C
         sba_read32(32'h0300_3000 + 32'h14, rd32);  // STATUS
         // Write to peripherals
-        sba_write32(32'h0300_5004, 32'h0000_AAAA);  // GPIO out
+        sba_write32(32'h0300_5014, 32'h0000_AAAA);  // GPIO out
         do_idle(10);
 
         // ═══════════════════════════════════════════════════════

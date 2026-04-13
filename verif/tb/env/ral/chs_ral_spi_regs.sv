@@ -207,9 +207,9 @@ class chs_ral_spi_block extends uvm_reg_block;
     rand chs_ral_spi_configopts configopts;   // 0x18
     rand chs_ral_spi_csid       csid;         // 0x24
     rand chs_ral_spi_command    command;      // 0x28
+         chs_ral_spi_rxdata     rxdata;       // 0x2C
     rand chs_ral_spi_txdata     txdata;       // 0x30
-         chs_ral_spi_rxdata     rxdata;       // 0x34 (placeholder)
-    rand chs_ral_spi_err_enable err_enable;   // 0x38 (placeholder)
+    rand chs_ral_spi_err_enable err_enable;   // 0x34
 
     uvm_reg_map default_map;
 
@@ -257,9 +257,9 @@ class chs_ral_spi_block extends uvm_reg_block;
         default_map.add_reg(configopts, 'h18, "RW");
         default_map.add_reg(csid,       'h24, "RW");
         default_map.add_reg(command,    'h28, "WO");
+        default_map.add_reg(rxdata,     'h2C, "RO");
         default_map.add_reg(txdata,     'h30, "WO");
-        default_map.add_reg(rxdata,     'h34, "RO");
-        default_map.add_reg(err_enable, 'h38, "RW");
+        default_map.add_reg(err_enable, 'h34, "RW");
 
         lock_model();
     endfunction

@@ -8,7 +8,7 @@
 // Testing) flow:
 //   1. Boot the JTAG TAP and activate the Debug Module
 //   2. Halt the CVA6 processor core
-//   3. Load a pre-compiled bare-metal C test binary into SPM via JTAG SBA
+//   3. Load a pre-compiled bare-metal C test binary into DRAM via JTAG SBA
 //   4. Set the program counter to the entry point
 //   5. Resume the core and let the firmware execute
 //   6. Poll the SCRATCH[2] register for End-of-Computation (EOC)
@@ -30,6 +30,7 @@ class chs_sw_driven_vseq extends uvm_sequence;
 
     // ─── Configuration ───
     string  test_name       = "test_hello";
+    string  program_words_file = "";   // Optional: text file with one 32-bit hex word per line
     int     timeout_cycles  = 500000;     // Max cycles to wait for EOC
 
     // ─── Memory Map Constants ───
@@ -68,6 +69,18 @@ class chs_sw_driven_vseq extends uvm_sequence;
         bit [31:0]     rdata;
         bit [1:0]      rop;
         int            exit_code;
+
+        // Optional runtime configuration via plusargs.
+        if (program_words_file == "") begin
+            string pa_words;
+            if ($value$plusargs("SW_WORDS_FILE=%s", pa_words))
+                program_words_file = pa_words;
+        end
+        begin
+            string pa_testname;
+            if ($value$plusargs("SW_TEST_NAME=%s", pa_testname))
+                test_name = pa_testname;
+        end
 
         `uvm_info(get_type_name(), $sformatf(
             "═══════ SW-Driven Test: %s ═══════", test_name), UVM_LOW)
@@ -121,9 +134,9 @@ class chs_sw_driven_vseq extends uvm_sequence;
         `uvm_info(get_type_name(), "[4/7] Clearing EOC register (SCRATCH[2])", UVM_MEDIUM)
         jtag_seq.sba_write32(SCRATCH2_ADDR, 32'h0, p_sequencer.m_jtag_sqr);
 
-        // ─── Phase 4: Load Program into SPM ───
+        // ─── Phase 4: Load Program into DRAM ───
         `uvm_info(get_type_name(), $sformatf(
-            "[5/7] Loading program into SPM (%0d words)", program_size), UVM_MEDIUM)
+            "[5/7] Loading program into DRAM (%0d words)", program_size), UVM_MEDIUM)
 
         load_program(jtag_seq);
 
@@ -224,9 +237,15 @@ class chs_sw_driven_vseq extends uvm_sequence;
         bit [31:0] addr;
 
         if (program_size == 0) begin
-            `uvm_info(get_type_name(), 
-                "  No external binary — loading built-in minimal test", UVM_MEDIUM)
-            load_builtin_test();
+            if (program_words_file != "") begin
+                `uvm_info(get_type_name(),
+                    $sformatf("  Loading external words file: %s", program_words_file), UVM_MEDIUM)
+                load_program_words_file(program_words_file);
+            end else begin
+                `uvm_info(get_type_name(),
+                    "  No external binary — loading built-in minimal test", UVM_MEDIUM)
+                load_builtin_test();
+            end
         end
 
         `uvm_info(get_type_name(), $sformatf(
@@ -266,6 +285,44 @@ class chs_sw_driven_vseq extends uvm_sequence;
         end
 
     endtask : load_program
+
+    // ═══════════════════════════════════════════
+    // Load Program From Text Word File
+    // File format: one 32-bit hex word per line (no 0x prefix required)
+    // Example line: 00100293
+    // ═══════════════════════════════════════════
+    virtual task load_program_words_file(string file_path);
+        int fd;
+        int rc;
+        string line;
+        bit [31:0] word;
+        bit [31:0] words_q[$];
+
+        fd = $fopen(file_path, "r");
+        if (fd == 0)
+            `uvm_fatal(get_type_name(), $sformatf("Cannot open SW words file: %s", file_path))
+
+        while (!$feof(fd)) begin
+            rc = $fscanf(fd, "%h", word);
+            if (rc == 1) begin
+                words_q.push_back(word);
+            end else begin
+                void'($fgets(line, fd));
+            end
+        end
+        $fclose(fd);
+
+        if (words_q.size() == 0)
+            `uvm_fatal(get_type_name(), $sformatf("SW words file is empty: %s", file_path))
+
+        program_size = words_q.size();
+        program_image = new[program_size];
+        for (int i = 0; i < program_size; i++)
+            program_image[i] = words_q[i];
+
+        `uvm_info(get_type_name(), $sformatf(
+            "  Loaded %0d words from %s", program_size, file_path), UVM_MEDIUM)
+    endtask : load_program_words_file
 
     // ═══════════════════════════════════════════
     // Built-in Minimal Test Program
