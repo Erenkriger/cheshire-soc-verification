@@ -24,6 +24,11 @@ package chs_seq_pkg;
     // Import RAL package (register model types)
     import chs_ral_pkg::*;
 
+`ifdef CHS_SW_ONLY
+    // Firmware-only mode: compile only dependencies for chs_sw_external_test.
+    `include "ip/jtag_base_seq.sv"
+    `include "virtual/chs_sw_driven_vseq.sv"
+`else
     // ----- IP-level sequences -----
     `include "ip/jtag_base_seq.sv"
     `include "ip/uart_base_seq.sv"
@@ -86,5 +91,6 @@ package chs_seq_pkg;
     `include "virtual/chs_usb_vseq.sv"
     `include "virtual/chs_idma_vseq.sv"
     `include "virtual/chs_dram_bist_vseq.sv"
+`endif
 
 endpackage : chs_seq_pkg

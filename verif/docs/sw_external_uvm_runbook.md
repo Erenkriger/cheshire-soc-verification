@@ -19,6 +19,7 @@ This generates:
 ```bash
 cd /home/tutel/SOC_UVM/verif
 make sim TEST=chs_sw_external_test \
+  SIM_TIME=10000000000000 \
   VERBOSITY=UVM_MEDIUM \
   PLUSARGS='+SW_WORDS_FILE=../sw/build/test_gpio_deep.words +SW_TEST_NAME=test_gpio_deep +SW_TIMEOUT_CYCLES=400000'
 ```
@@ -28,6 +29,7 @@ make sim TEST=chs_sw_external_test \
 ```bash
 cd /home/tutel/SOC_UVM/verif
 make sim_gui TEST=chs_sw_external_test \
+  SIM_TIME=10000000000000 \
   VERBOSITY=UVM_MEDIUM \
   PLUSARGS='+SW_WORDS_FILE=../sw/build/test_gpio_deep.words +SW_TEST_NAME=test_gpio_deep +SW_TIMEOUT_CYCLES=400000'
 ```
@@ -51,3 +53,8 @@ bash sim/run_sw_external_regression.sh
 - `+SW_WORDS_FILE=../sw/build/<test>.words` : select C test image
 - `+SW_TEST_NAME=<name>` : UVM log label
 - `+SW_TIMEOUT_CYCLES=<n>` : polling timeout for EOC
+
+## 7) Timeout note
+
+- In this setup, use numeric `SIM_TIME` (in simulator time units) rather than `ms/us` suffixes.
+- Recommended baseline: `SIM_TIME=10000000000000`

@@ -20,6 +20,10 @@ VERIF_ROOT := $(shell realpath $(dir $(lastword $(MAKEFILE_LIST))))
 CHS_ROOT   := $(VERIF_ROOT)/../cheshire
 BENDER     ?= bender -d $(CHS_ROOT)
 
+# Header roots used by cheshire/hw/include/cheshire/typedef.svh
+AXI_INC_DIR   := $(firstword $(wildcard $(CHS_ROOT)/.bender/git/checkouts/axi-*/include))
+REGIF_INC_DIR := $(firstword $(wildcard $(CHS_ROOT)/.bender/git/checkouts/register_interface-*/include))
+
 # UVM source (Questa ships UVM; for others, set UVM_HOME)
 UVM_HOME   ?= $(QUESTA_HOME)/verilog_src/uvm-1.2
 
@@ -45,17 +49,28 @@ VERBOSITY  ?= UVM_MEDIUM
 SIM_TIME   ?= 10ms
 PLUSARGS   ?=
 
+# Compile only firmware-driven verification path when requested.
+VLOG_DEFINES :=
+ifeq ($(TEST),chs_sw_external_test)
+VLOG_DEFINES += +define+CHS_SW_ONLY
+endif
+
 # Build directory
 BUILD_DIR  := $(VERIF_ROOT)/build
 WORK_DIR   := $(BUILD_DIR)/work
 
 # ─── UVM TB File List ────────────────────────────────────────────────────
-TB_TOP := $(VERIF_ROOT)/tb/top/tb_top.sv
+TB_TOP_FILES := \
+	$(VERIF_ROOT)/tb/top/chs_protocol_checker.sv \
+	$(VERIF_ROOT)/tb/top/chs_soc_sva_checker.sv \
+	$(VERIF_ROOT)/tb/top/chs_axi_protocol_checker.sv \
+	$(VERIF_ROOT)/tb/top/tb_top.sv
 
 TB_AGENT_DIR := $(VERIF_ROOT)/tb/agents
 TB_ENV_DIR   := $(VERIF_ROOT)/tb/env
 TB_SEQ_DIR   := $(VERIF_ROOT)/tb/sequences
 TB_TEST_DIR  := $(VERIF_ROOT)/tb/tests
+TB_RAL_DIR   := $(TB_ENV_DIR)/ral
 
 # Include paths for UVM TB
 TB_INCDIRS := \
@@ -69,11 +84,14 @@ TB_INCDIRS := \
 	+incdir+$(TB_AGENT_DIR)/vga_agent  \
 	+incdir+$(TB_AGENT_DIR)/usb_agent  \
 	+incdir+$(TB_ENV_DIR)  \
+	+incdir+$(TB_RAL_DIR)  \
 	+incdir+$(TB_SEQ_DIR)  \
 	+incdir+$(TB_SEQ_DIR)/ip  \
 	+incdir+$(TB_SEQ_DIR)/virtual \
 	+incdir+$(TB_TEST_DIR) \
-	+incdir+$(CHS_ROOT)/hw/include
+	+incdir+$(CHS_ROOT)/hw/include \
+	+incdir+$(AXI_INC_DIR) \
+	+incdir+$(REGIF_INC_DIR)
 
 # UVM TB package files (order matters: agents → env → sequences → tests)
 TB_PKGS := \
@@ -86,6 +104,7 @@ TB_PKGS := \
 	$(TB_AGENT_DIR)/slink_agent/slink_pkg.sv \
 	$(TB_AGENT_DIR)/vga_agent/vga_pkg.sv   \
 	$(TB_AGENT_DIR)/usb_agent/usb_pkg.sv   \
+	$(TB_RAL_DIR)/chs_ral_pkg.sv \
 	$(TB_ENV_DIR)/chs_env_pkg.sv \
 	$(TB_SEQ_DIR)/chs_seq_pkg.sv \
 	$(TB_TEST_DIR)/chs_test_pkg.sv
@@ -133,15 +152,16 @@ compile: $(BUILD_DIR)/compile_chs_rtl.tcl | $(WORK_DIR)
 	@echo "════════════════════════════════════════════════════"
 	@echo "  Step 1/2: Compiling Cheshire RTL"
 	@echo "════════════════════════════════════════════════════"
-	cd $(BUILD_DIR) && vsim -c -do "source ../compile_chs_rtl.tcl; quit"
+	cd $(BUILD_DIR) && vsim -c -do "source compile_chs_rtl.tcl; quit"
 	@echo "════════════════════════════════════════════════════"
 	@echo "  Step 2/2: Compiling UVM Testbench"
 	@echo "════════════════════════════════════════════════════"
 	cd $(BUILD_DIR) && $(VLOG) $(VLOG_FLAGS) \
+		$(VLOG_DEFINES) \
 		$(TB_INCDIRS) \
 		$(TB_IFS) \
 		$(TB_PKGS) \
-		$(TB_TOP)
+		$(TB_TOP_FILES)
 
 .PHONY: sim
 sim: compile

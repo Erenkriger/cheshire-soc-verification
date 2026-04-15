@@ -28,6 +28,11 @@ package chs_test_pkg;
 
     // ----- Test files (order: base first, then derived) -----
     `include "chs_base_test.sv"
+
+`ifdef CHS_SW_ONLY
+    // Firmware-only mode: only external SW-driven test.
+    `include "chs_sw_external_test.sv"
+`else
     `include "chs_sanity_test.sv"
     `include "chs_jtag_boot_test.sv"
     `include "chs_uart_test.sv"
@@ -85,5 +90,6 @@ package chs_test_pkg;
     `include "chs_sw_hello_test.sv"
     `include "chs_sw_gpio_test.sv"
     `include "chs_sw_external_test.sv"
+`endif
 
 endpackage : chs_test_pkg

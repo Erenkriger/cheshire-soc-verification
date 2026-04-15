@@ -137,7 +137,7 @@ module chs_axi_protocol_checker #(
     ) else begin err_count++; $error("[%s][RST] BVALID high during reset", PORT_NAME); end
 
     a_rst_arvalid: assert property (
-        @(posedge aclk) !aresetn |-> !arvalid
+                @(posedge aclk) !aresetn |-> !arvalid
     ) else begin err_count++; $error("[%s][RST] ARVALID high during reset", PORT_NAME); end
 
     a_rst_rvalid: assert property (

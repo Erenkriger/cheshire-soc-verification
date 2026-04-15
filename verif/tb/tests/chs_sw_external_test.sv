@@ -15,7 +15,7 @@ class chs_sw_external_test extends chs_base_test;
 
     function new(string name, uvm_component parent);
         super.new(name, parent);
-        m_timeout = 100ms;
+        m_timeout = 500ms; // Extended Watchdog for Extreme Benchmark!
     endfunction
 
     virtual task test_body();

@@ -1,0 +1,173 @@
+
+/home/tutel/SOC_UVM/verif/sw/build/test_memory.elf:     elf64-littleriscv dosya biçemi
+
+SYMBOL TABLE:
+0000000010000000 l    d  .text	0000000000000000 .text
+0000000000000000 l    d  .riscv.attributes	0000000000000000 .riscv.attributes
+0000000000000000 l    d  .comment	0000000000000000 .comment
+0000000000000000 l    df *ABS*	0000000000000000 cc8cIPgd.o
+0000000000000000 l    df *ABS*	0000000000000000 test_memory.c
+000000001000004e l     F .text	000000000000011e test_region.constprop.0
+0000000010000000 g       *ABS*	0000000000000000 __base_spm
+0000000003004000 g       *ABS*	0000000000000000 __base_spih
+0000000003007000 g       *ABS*	0000000000000000 __base_vga
+0000000010000990 g       .text	0000000000000000 __global_pointer
+0000000003000000 g       *ABS*	0000000000000000 __base_regs
+0000000080000000 g       *ABS*	0000000000000000 __base_dram
+0000000010000190 g       .text	0000000000000000 __bss_end
+0000000010000190 g       .text	0000000000000000 __stack_start
+0000000003005000 g       *ABS*	0000000000000000 __base_gpio
+0000000003006000 g       *ABS*	0000000000000000 __base_slink
+0000000010000000 g     F .text	000000000000004e _start
+0000000004000000 g       *ABS*	0000000000000000 __base_plic
+0000000002040000 g       *ABS*	0000000000000000 __base_clint
+0000000003001000 g       *ABS*	0000000000000000 __base_llc
+0000000003003000 g       *ABS*	0000000000000000 __base_i2c
+0000000010000190 g       .text	0000000000000000 __bss_start
+000000001000016c g     F .text	0000000000000024 main
+0000000003002000 g       *ABS*	0000000000000000 __base_uart
+0000000003008000 g       *ABS*	0000000000000000 __base_usb
+000000001000fff0 g       .text	0000000000000000 __stack_pointer
+0000000010000038 g     F .text	0000000000000000 _exit
+
+
+
+Disassembly of section .text:
+
+0000000010000000 <_start>:
+    10000000:	30047073          	csrci	mstatus,8
+    10000004:	00010117          	auipc	sp,0x10
+    10000008:	fec10113          	addi	sp,sp,-20 # 1000fff0 <__stack_pointer>
+    1000000c:	00001197          	auipc	gp,0x1
+    10000010:	98418193          	addi	gp,gp,-1660 # 10000990 <__global_pointer>
+    10000014:	00000297          	auipc	t0,0x0
+    10000018:	17c28293          	addi	t0,t0,380 # 10000190 <__bss_end>
+    1000001c:	00000317          	auipc	t1,0x0
+    10000020:	17430313          	addi	t1,t1,372 # 10000190 <__bss_end>
+    10000024:	0062d663          	bge	t0,t1,10000030 <_start+0x30>
+    10000028:	0002b023          	sd	zero,0(t0)
+    1000002c:	02a1                	addi	t0,t0,8
+    1000002e:	bfdd                	j	10000024 <_start+0x24>
+    10000030:	0ff0000f          	fence
+    10000034:	138000ef          	jal	1000016c <main>
+
+0000000010000038 <_exit>:
+    10000038:	00151293          	slli	t0,a0,0x1
+    1000003c:	0012e293          	ori	t0,t0,1
+    10000040:	03000337          	lui	t1,0x3000
+    10000044:	00532423          	sw	t0,8(t1) # 3000008 <__base_regs+0x8>
+    10000048:	10500073          	wfi
+    1000004c:	bff5                	j	10000048 <_exit+0x10>
+
+000000001000004e <test_region.constprop.0>:
+    1000004e:	10050713          	addi	a4,a0,256
+    10000052:	87aa                	mv	a5,a0
+    10000054:	0007a023          	sw	zero,0(a5)
+    10000058:	0791                	addi	a5,a5,4
+    1000005a:	fee79de3          	bne	a5,a4,10000054 <test_region.constprop.0+0x6>
+    1000005e:	0ff0000f          	fence
+    10000062:	87aa                	mv	a5,a0
+    10000064:	4394                	lw	a3,0(a5)
+    10000066:	0791                	addi	a5,a5,4
+    10000068:	0006861b          	sext.w	a2,a3
+    1000006c:	e2ed                	bnez	a3,1000014e <test_region.constprop.0+0x100>
+    1000006e:	fee79be3          	bne	a5,a4,10000064 <test_region.constprop.0+0x16>
+    10000072:	87aa                	mv	a5,a0
+    10000074:	56fd                	li	a3,-1
+    10000076:	c394                	sw	a3,0(a5)
+    10000078:	0791                	addi	a5,a5,4
+    1000007a:	fee79ee3          	bne	a5,a4,10000076 <test_region.constprop.0+0x28>
+    1000007e:	0ff0000f          	fence
+    10000082:	587d                	li	a6,-1
+    10000084:	87aa                	mv	a5,a0
+    10000086:	4394                	lw	a3,0(a5)
+    10000088:	0791                	addi	a5,a5,4
+    1000008a:	0d069563          	bne	a3,a6,10000154 <test_region.constprop.0+0x106>
+    1000008e:	fee79ce3          	bne	a5,a4,10000086 <test_region.constprop.0+0x38>
+    10000092:	87aa                	mv	a5,a0
+    10000094:	0007869b          	sext.w	a3,a5
+    10000098:	c394                	sw	a3,0(a5)
+    1000009a:	0791                	addi	a5,a5,4
+    1000009c:	fee79ce3          	bne	a5,a4,10000094 <test_region.constprop.0+0x46>
+    100000a0:	0ff0000f          	fence
+    100000a4:	87aa                	mv	a5,a0
+    100000a6:	0007a803          	lw	a6,0(a5)
+    100000aa:	0007869b          	sext.w	a3,a5
+    100000ae:	0791                	addi	a5,a5,4
+    100000b0:	0ad81563          	bne	a6,a3,1000015a <test_region.constprop.0+0x10c>
+    100000b4:	fee799e3          	bne	a5,a4,100000a6 <test_region.constprop.0+0x58>
+    100000b8:	55555837          	lui	a6,0x55555
+    100000bc:	55580813          	addi	a6,a6,1365 # 55555555 <__stack_pointer+0x45545565>
+    100000c0:	86aa                	mv	a3,a0
+    100000c2:	4781                	li	a5,0
+    100000c4:	04000893          	li	a7,64
+    100000c8:	03f79313          	slli	t1,a5,0x3f
+    100000cc:	43f35713          	srai	a4,t1,0x3f
+    100000d0:	01074733          	xor	a4,a4,a6
+    100000d4:	c298                	sw	a4,0(a3)
+    100000d6:	2785                	addiw	a5,a5,1
+    100000d8:	0691                	addi	a3,a3,4
+    100000da:	ff1797e3          	bne	a5,a7,100000c8 <test_region.constprop.0+0x7a>
+    100000de:	0ff0000f          	fence
+    100000e2:	aaaab837          	lui	a6,0xaaaab
+    100000e6:	872a                	mv	a4,a0
+    100000e8:	aaa80813          	addi	a6,a6,-1366 # ffffffffaaaaaaaa <__base_dram+0xffffffff2aaaaaaa>
+    100000ec:	04000893          	li	a7,64
+    100000f0:	fff64793          	not	a5,a2
+    100000f4:	03f79313          	slli	t1,a5,0x3f
+    100000f8:	4314                	lw	a3,0(a4)
+    100000fa:	43f35793          	srai	a5,t1,0x3f
+    100000fe:	0107c7b3          	xor	a5,a5,a6
+    10000102:	2605                	addiw	a2,a2,1
+    10000104:	04f69e63          	bne	a3,a5,10000160 <test_region.constprop.0+0x112>
+    10000108:	0711                	addi	a4,a4,4
+    1000010a:	ff1613e3          	bne	a2,a7,100000f0 <test_region.constprop.0+0xa2>
+    1000010e:	4781                	li	a5,0
+    10000110:	4805                	li	a6,1
+    10000112:	02000613          	li	a2,32
+    10000116:	00279713          	slli	a4,a5,0x2
+    1000011a:	00f816bb          	sllw	a3,a6,a5
+    1000011e:	972a                	add	a4,a4,a0
+    10000120:	c314                	sw	a3,0(a4)
+    10000122:	0785                	addi	a5,a5,1
+    10000124:	fec799e3          	bne	a5,a2,10000116 <test_region.constprop.0+0xc8>
+    10000128:	0ff0000f          	fence
+    1000012c:	4781                	li	a5,0
+    1000012e:	4605                	li	a2,1
+    10000130:	02000813          	li	a6,32
+    10000134:	00279713          	slli	a4,a5,0x2
+    10000138:	972a                	add	a4,a4,a0
+    1000013a:	4318                	lw	a4,0(a4)
+    1000013c:	00f616bb          	sllw	a3,a2,a5
+    10000140:	0785                	addi	a5,a5,1
+    10000142:	02e69263          	bne	a3,a4,10000166 <test_region.constprop.0+0x118>
+    10000146:	ff0797e3          	bne	a5,a6,10000134 <test_region.constprop.0+0xe6>
+    1000014a:	4501                	li	a0,0
+    1000014c:	8082                	ret
+    1000014e:	0015851b          	addiw	a0,a1,1
+    10000152:	8082                	ret
+    10000154:	0025851b          	addiw	a0,a1,2
+    10000158:	8082                	ret
+    1000015a:	0035851b          	addiw	a0,a1,3
+    1000015e:	8082                	ret
+    10000160:	0045851b          	addiw	a0,a1,4
+    10000164:	8082                	ret
+    10000166:	0055851b          	addiw	a0,a1,5
+    1000016a:	8082                	ret
+
+000000001000016c <main>:
+    1000016c:	1141                	addi	sp,sp,-16
+    1000016e:	45a9                	li	a1,10
+    10000170:	10008537          	lui	a0,0x10008
+    10000174:	e406                	sd	ra,8(sp)
+    10000176:	ed9ff0ef          	jal	1000004e <test_region.constprop.0>
+    1000017a:	c501                	beqz	a0,10000182 <main+0x16>
+    1000017c:	60a2                	ld	ra,8(sp)
+    1000017e:	0141                	addi	sp,sp,16
+    10000180:	8082                	ret
+    10000182:	60a2                	ld	ra,8(sp)
+    10000184:	00801537          	lui	a0,0x801
+    10000188:	0522                	slli	a0,a0,0x8
+    1000018a:	45d1                	li	a1,20
+    1000018c:	0141                	addi	sp,sp,16
+    1000018e:	b5c1                	j	1000004e <test_region.constprop.0>
